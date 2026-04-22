@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Application xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="fabric:/PlaniranjePutovanja" xmlns="http://schemas.microsoft.com/2011/01/fabric">
+  <Parameters>
+    <Parameter Name="Web1_ASPNETCORE_ENVIRONMENT" Value="Development" />
+    <Parameter Name="Web1_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=Web1-PlaniranjePutovanja" />
+    <Parameter Name="TravelPlansApi_ASPNETCORE_ENVIRONMENT" Value="Development" />
+    <Parameter Name="TravelPlansApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=TravelPlansApi-PlaniranjePutovanja" />
+  </Parameters>
+</Application>

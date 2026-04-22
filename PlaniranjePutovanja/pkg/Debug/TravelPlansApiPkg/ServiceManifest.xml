@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ServiceManifest Name="TravelPlansApiPkg" Version="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ManifestId="a8c4b2e1-6f0d-4a3b-9e7c-1d2f3a4b5c6d">
+  <ServiceTypes>
+    <StatelessServiceType ServiceTypeName="TravelPlansApiType" />
+  </ServiceTypes>
+  <CodePackage Name="Code" Version="1.0.0">
+    <EntryPoint>
+      <ExeHost>
+        <Program>TravelPlansApi.exe</Program>
+        <WorkingFolder>CodePackage</WorkingFolder>
+      </ExeHost>
+    </EntryPoint>
+    <EnvironmentVariables>
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="" />
+      <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="" />
+    </EnvironmentVariables>
+  </CodePackage>
+  <ConfigPackage Name="Config" Version="1.0.0" />
+  <Resources>
+    <Endpoints>
+      <Endpoint Protocol="http" Name="ServiceEndpoint" Type="Input" Port="8916" />
+    </Endpoints>
+  </Resources>
+</ServiceManifest>

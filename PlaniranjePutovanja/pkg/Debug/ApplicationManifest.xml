@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ApplicationManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ApplicationTypeName="PlaniranjePutovanjaType" ApplicationTypeVersion="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric" ManifestId="3b3d8c0e-0500-49cc-9354-21a76016c2e0">
+  <Parameters>
+    <Parameter Name="Web1_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
+    <Parameter Name="Web1_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=Web1-PlaniranjePutovanja" />
+    <Parameter Name="TravelPlansApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
+    <Parameter Name="TravelPlansApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=TravelPlansApi-PlaniranjePutovanja" />
+  </Parameters>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="Web1Pkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[Web1_ASPNETCORE_ENVIRONMENT]" />
+      <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[Web1_DefaultConnection]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="TravelPlansApiPkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[TravelPlansApi_ASPNETCORE_ENVIRONMENT]" />
+      <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[TravelPlansApi_DefaultConnection]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
+</ApplicationManifest>
