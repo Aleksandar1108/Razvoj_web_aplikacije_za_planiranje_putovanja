@@ -2,6 +2,7 @@
 **/bin/
 **/obj/
 node_modules/
+client/.vite/
 npm-debug.log*
 yarn-error.log*
 *.user
