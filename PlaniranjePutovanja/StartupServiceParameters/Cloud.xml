@@ -3,5 +3,6 @@
   <Parameters>
     <Parameter Name="Web1_InstanceCount" Value="-1" />
     <Parameter Name="TravelPlansApi_InstanceCount" Value="-1" />
+    <Parameter Name="DestinationsApi_InstanceCount" Value="-1" />
   </Parameters>
 </StartupServices>

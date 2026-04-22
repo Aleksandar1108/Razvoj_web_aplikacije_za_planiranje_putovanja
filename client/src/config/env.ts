@@ -11,3 +11,10 @@ export function getTravelPlansApiBaseUrl(): string {
   const trimmed = (raw ?? '').trim().replace(/\/$/, '');
   return trimmed;
 }
+
+/** Mikroservis destinacija (DestinationsApi / ServiceManifest — port 8917). */
+export function getDestinationsApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_DESTINATIONS_API_BASE_URL as string | undefined;
+  const trimmed = (raw ?? '').trim().replace(/\/$/, '');
+  return trimmed;
+}

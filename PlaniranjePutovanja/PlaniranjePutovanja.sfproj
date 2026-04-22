@@ -42,6 +42,9 @@
     <ProjectReference Include="..\TravelPlansApi\TravelPlansApi.csproj">
       <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
     </ProjectReference>
+    <ProjectReference Include="..\DestinationsApi\DestinationsApi.csproj">
+      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
   <PropertyGroup>
