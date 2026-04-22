@@ -43,11 +43,14 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="page narrow">
-      <h1>Registracija</h1>
-      <p className="muted">Kreira se nalog sa ulogom korisnika (User).</p>
+    <div className="auth-page">
+      <div className="auth-page-bg" aria-hidden />
+      <div className="page narrow auth-panel">
+        <p className="auth-kicker">Planiranje putovanja</p>
+        <h1 className="auth-title">Registracija</h1>
+        <p className="muted auth-lead">Kreira se nalog sa ulogom korisnika (User).</p>
 
-      <form className="card form" onSubmit={onSubmit}>
+        <form className="card form glass-panel auth-form" onSubmit={onSubmit}>
         <label>
           Ime
           <input
@@ -95,14 +98,15 @@ export function RegisterPage() {
 
         {error ? <p className="error">{error}</p> : null}
 
-        <button type="submit" className="btn primary" disabled={pending}>
+        <button type="submit" className="btn btn-glow primary btn-lg auth-submit" disabled={pending}>
           {pending ? 'Registracija…' : 'Registruj se'}
         </button>
       </form>
 
-      <p className="muted">
+      <p className="muted auth-footer">
         Već imaš nalog? <Link to="/login">Prijavi se</Link>
       </p>
+      </div>
     </div>
   );
 }

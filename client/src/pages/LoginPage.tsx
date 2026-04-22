@@ -30,11 +30,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="page narrow">
-      <h1>Prijava</h1>
-      <p className="muted">Unesi email i lozinku da pristupiš aplikaciji.</p>
+    <div className="auth-page">
+      <div className="auth-page-bg" aria-hidden />
+      <div className="page narrow auth-panel">
+        <p className="auth-kicker">Planiranje putovanja</p>
+        <h1 className="auth-title">Prijava</h1>
+        <p className="muted auth-lead">Unesi email i lozinku da pristupiš svojim planovima.</p>
 
-      <form className="card form" onSubmit={onSubmit}>
+        <form className="card form glass-panel auth-form" onSubmit={onSubmit}>
         <label>
           Email
           <input
@@ -59,14 +62,15 @@ export function LoginPage() {
 
         {error ? <p className="error">{error}</p> : null}
 
-        <button type="submit" className="btn primary" disabled={pending}>
+        <button type="submit" className="btn btn-glow primary btn-lg auth-submit" disabled={pending}>
           {pending ? 'Prijava…' : 'Prijavi se'}
         </button>
       </form>
 
-      <p className="muted">
+      <p className="muted auth-footer">
         Nemaš nalog? <Link to="/register">Registruj se</Link>
       </p>
+      </div>
     </div>
   );
 }

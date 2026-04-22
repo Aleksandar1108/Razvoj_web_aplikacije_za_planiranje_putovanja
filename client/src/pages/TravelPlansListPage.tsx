@@ -56,35 +56,43 @@ export function TravelPlansListPage() {
     };
   }, [accessToken]);
 
+  const count = plans?.length ?? 0;
+
   return (
     <div className="plans-page">
       <section className="plans-hero">
         <div className="plans-hero-copy">
-          <p className="plans-kicker">Mikroservis TravelPlansApi</p>
+          <p className="plans-kicker">Tvoji planovi putovanja</p>
           <h1>Planovi putovanja</h1>
           <p className="plans-lead">
-            Kreiraj putovanje sa nazivom, opisom, datumima, budžetom i napomenama. Lista i detalji su vezani za tvoj nalog.
+            Kreiraj putovanje sa nazivom, opisom, datumima, budžetom i napomenama. Lista i detalji su vezani za tvoj
+            nalog.
           </p>
           <div className="plans-hero-actions">
-            <Link to="/plans/new" className="btn primary">
+            <Link to="/plans/new" className="btn btn-glow primary btn-lg">
               Novi plan
             </Link>
+            {!loading && plans ? (
+              <span className="plans-hero-badge">{count === 1 ? '1 plan' : `${count} planova`}</span>
+            ) : null}
           </div>
         </div>
-        <div className="plans-hero-art" aria-hidden />
       </section>
 
       {loading ? (
-        <div className="card plans-loading">Učitavanje planova…</div>
+        <div className="card plans-loading glass-panel plans-skeleton">Učitavanje planova…</div>
       ) : error ? (
-        <div className="card">
+        <div className="card glass-panel">
           <p className="error">{error}</p>
         </div>
       ) : plans && plans.length === 0 ? (
-        <div className="card plans-empty">
+        <div className="card plans-empty glass-panel plans-empty-card">
+          <div className="plans-empty-icon" aria-hidden>
+            ◎
+          </div>
           <h2>Još nemaš planova</h2>
-          <p className="muted">Klikni „Novi plan“ i opiši svoje naredno putovanje.</p>
-          <Link to="/plans/new" className="btn primary">
+          <p className="muted">Klikni „Novi plan“ i opiši svoje naredno putovanje — uključujući budžet.</p>
+          <Link to="/plans/new" className="btn btn-glow primary btn-lg">
             Kreiraj prvi plan
           </Link>
         </div>
@@ -92,6 +100,7 @@ export function TravelPlansListPage() {
         <div className="plan-grid">
           {plans?.map((p) => (
             <Link key={p.id} to={`/plans/${p.id}`} className="plan-card">
+              <div className="plan-card-shine" aria-hidden />
               <div className="plan-card-top">
                 <h2 className="plan-card-title">{p.name}</h2>
                 <span className="plan-chip">{tripLengthDays(p.startDate, p.endDate)} dana</span>
@@ -101,7 +110,9 @@ export function TravelPlansListPage() {
                 <span>
                   {formatShortDate(p.startDate)} — {formatShortDate(p.endDate)}
                 </span>
-                <span className="plan-budget">{formatBudget(p.plannedBudget)}</span>
+                <span className="plan-budget" title="Planirani budžet">
+                  {p.plannedBudget > 0 ? `${formatBudget(p.plannedBudget)} €` : 'Budžet —'}
+                </span>
               </div>
             </Link>
           ))}

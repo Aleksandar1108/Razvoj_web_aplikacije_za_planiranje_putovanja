@@ -56,10 +56,20 @@ export function TravelPlanFormPage() {
     };
   }, [isEdit, planId, accessToken]);
 
+  const budgetInputValue =
+    isEdit || form.plannedBudget !== 0 ? (Number.isNaN(form.plannedBudget) ? '' : String(form.plannedBudget)) : '';
+
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();
     setSaving(true);
     setError(null);
+
+    if (!isEdit && form.plannedBudget <= 0) {
+      setError('Unesi planirani budžet u EUR (broj veći od nule).');
+      setSaving(false);
+      return;
+    }
+
     const payload: TravelPlanUpsert = {
       ...form,
       generalNotes: form.generalNotes?.trim() ? form.generalNotes.trim() : null,
@@ -82,7 +92,7 @@ export function TravelPlanFormPage() {
   if (loading) {
     return (
       <div className="page plans-form-page">
-        <div className="card">Učitavanje…</div>
+        <div className="card glass-panel plans-form-loading">Učitavanje…</div>
       </div>
     );
   }
@@ -93,89 +103,113 @@ export function TravelPlanFormPage() {
         <Link to={isEdit && planId ? `/plans/${planId}` : '/plans'} className="back-link">
           ← Nazad
         </Link>
-        <h1>{isEdit ? 'Izmijeni plan' : 'Novi plan putovanja'}</h1>
-        <p className="muted">
+        <h1 className="form-page-title">{isEdit ? 'Izmeni plan' : 'Novi plan putovanja'}</h1>
+        <p className="muted form-page-lead">
           {isEdit
             ? 'Ažuriraj podatke; datumi i budžet moraju ostati smisleni.'
-            : 'Unesi osnovne podatke — kasnije možeš dodati destinacije i stavke iz specifikacije.'}
+            : 'Popuni naziv, opis, datume i budžet — ostalo je opciono.'}
         </p>
       </div>
 
-      <form className="card form travel-plan-form" onSubmit={onSubmit}>
+      <form className="card form travel-plan-form glass-panel" onSubmit={onSubmit}>
         {error ? <p className="error">{error}</p> : null}
 
-        <label>
-          Naziv putovanja
-          <input
-            required
-            maxLength={200}
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="npr. Proljeće u Barceloni"
-          />
-        </label>
-
-        <label>
-          Kratak opis
-          <textarea
-            required
-            maxLength={500}
-            rows={3}
-            value={form.shortDescription}
-            onChange={(e) => setForm((f) => ({ ...f, shortDescription: e.target.value }))}
-            placeholder="Šta te vuče na ovo putovanje?"
-          />
-        </label>
-
-        <div className="field-grid-2">
+        <fieldset className="form-fieldset">
+          <legend>Osnova</legend>
           <label>
-            Početni datum
+            Naziv putovanja
             <input
-              type="date"
               required
-              value={form.startDate}
-              onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+              maxLength={200}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="npr. Proljeće u Barceloni"
             />
           </label>
+
           <label>
-            Krajnji datum
-            <input
-              type="date"
+            Kratak opis
+            <textarea
               required
-              value={form.endDate}
-              onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+              maxLength={500}
+              rows={3}
+              value={form.shortDescription}
+              onChange={(e) => setForm((f) => ({ ...f, shortDescription: e.target.value }))}
+              placeholder="Šta te vuče na ovo putovanje?"
             />
           </label>
-        </div>
+        </fieldset>
 
-        <label>
-          Planirani budžet
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            required
-            value={Number.isNaN(form.plannedBudget) ? '' : form.plannedBudget}
-            onChange={(e) => setForm((f) => ({ ...f, plannedBudget: Number(e.target.value) }))}
-          />
-        </label>
+        <fieldset className="form-fieldset">
+          <legend>Datumi</legend>
+          <div className="field-grid-2">
+            <label>
+              Početni datum
+              <input
+                type="date"
+                required
+                value={form.startDate}
+                onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+              />
+            </label>
+            <label>
+              Krajnji datum
+              <input
+                type="date"
+                required
+                value={form.endDate}
+                onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+              />
+            </label>
+          </div>
+        </fieldset>
 
-        <label>
-          Opšte napomene
-          <textarea
-            maxLength={4000}
-            rows={4}
-            value={form.generalNotes ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, generalNotes: e.target.value }))}
-            placeholder="Vize, parking, deca, zdravlje…"
-          />
-        </label>
+        <fieldset className="form-fieldset form-fieldset-budget">
+          <legend>Finansije</legend>
+          <label className="label-budget">
+            <span className="label-budget-text">Planirani budžet</span>
+            <span className="input-currency-wrap">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={0.01}
+                className="input-currency"
+                placeholder={isEdit ? undefined : 'npr. 1500'}
+                value={budgetInputValue}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const n = raw === '' ? 0 : Number(raw);
+                  setForm((f) => ({ ...f, plannedBudget: Number.isNaN(n) ? 0 : n }));
+                }}
+              />
+              <span className="input-currency-suffix" aria-hidden>
+                EUR
+              </span>
+            </span>
+            <span className="field-hint">Ukupan okvir koji planiraš za ovo putovanje (možeš kasnije prilagoditi).</span>
+          </label>
+        </fieldset>
+
+        <fieldset className="form-fieldset">
+          <legend>Napomene</legend>
+          <label>
+            Opšte napomene
+            <textarea
+              maxLength={4000}
+              rows={4}
+              value={form.generalNotes ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, generalNotes: e.target.value }))}
+              placeholder="Vize, parking, deca, zdravlje…"
+            />
+          </label>
+        </fieldset>
 
         <div className="form-actions">
-          <button type="submit" className="btn primary" disabled={saving}>
-            {saving ? 'Snimam…' : isEdit ? 'Sačuvaj izmjene' : 'Kreiraj plan'}
+          <button type="submit" className="btn btn-glow primary btn-lg" disabled={saving}>
+            {saving ? 'Snimam…' : isEdit ? 'Sačuvaj izmene' : 'Kreiraj plan'}
           </button>
-          <Link to={isEdit && planId ? `/plans/${planId}` : '/plans'} className="btn ghost">
+          <Link to={isEdit && planId ? `/plans/${planId}` : '/plans'} className="btn ghost btn-lg">
             Otkaži
           </Link>
         </div>

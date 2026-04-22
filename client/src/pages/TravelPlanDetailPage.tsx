@@ -107,7 +107,7 @@ export function TravelPlanDetailPage() {
         </div>
         <div className="plan-detail-toolbar">
           <Link to={`/plans/${plan.id}/edit`} className="btn primary">
-            Izmijeni
+            Izmeni
           </Link>
           <button type="button" className="btn danger ghost" onClick={() => setConfirmDelete(true)}>
             Obriši
@@ -164,7 +164,7 @@ export function TravelPlanDetailPage() {
 
         <section className="card plan-detail-panel meta">
           <p className="muted small">
-            Kreirano: {new Date(plan.createdAtUtc).toLocaleString('sr-Latn')} · Zadnja izmjena:{' '}
+            Kreirano: {new Date(plan.createdAtUtc).toLocaleString('sr-Latn')} · Zadnja izmena:{' '}
             {new Date(plan.updatedAtUtc).toLocaleString('sr-Latn')}
           </p>
         </section>

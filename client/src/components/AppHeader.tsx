@@ -5,7 +5,7 @@ export function AppHeader() {
   const { accessToken, user, logout } = useAuth();
 
   return (
-    <header className="header">
+    <header className="header header-elevated">
       <Link to="/" className="brand">
         Planiranje putovanja
       </Link>
