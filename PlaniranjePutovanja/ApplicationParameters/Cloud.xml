@@ -4,5 +4,6 @@
     <Parameter Name="Web1_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;Integrated Security=True;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=Web1-PlaniranjePutovanja" />
     <Parameter Name="TravelPlansApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;Integrated Security=True;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=TravelPlansApi-PlaniranjePutovanja" />
     <Parameter Name="DestinationsApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;Integrated Security=True;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=DestinationsApi-PlaniranjePutovanja" />
+    <Parameter Name="ActivitiesApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;Integrated Security=True;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ActivitiesApi-PlaniranjePutovanja" />
   </Parameters>
 </Application>

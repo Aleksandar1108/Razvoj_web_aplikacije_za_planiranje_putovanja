@@ -18,3 +18,10 @@ export function getDestinationsApiBaseUrl(): string {
   const trimmed = (raw ?? '').trim().replace(/\/$/, '');
   return trimmed;
 }
+
+/** Mikroservis dnevnih aktivnosti (ActivitiesApi / ServiceManifest — port 8919). */
+export function getActivitiesApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_ACTIVITIES_API_BASE_URL as string | undefined;
+  const trimmed = (raw ?? '').trim().replace(/\/$/, '');
+  return trimmed;
+}

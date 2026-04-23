@@ -4,6 +4,7 @@
     <Parameter Name="Web1_InstanceCount" DefaultValue="-1" />
     <Parameter Name="TravelPlansApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="DestinationsApi_InstanceCount" DefaultValue="-1" />
+    <Parameter Name="ActivitiesApi_InstanceCount" DefaultValue="-1" />
   </Parameters>
   <Services>
     <!-- The section below creates instances of service types, when an instance of this 
@@ -23,6 +24,11 @@
     </Service>
     <Service Name="DestinationsApi" ServicePackageActivationMode="ExclusiveProcess">
       <StatelessService ServiceTypeName="DestinationsApiType" InstanceCount="[DestinationsApi_InstanceCount]">
+        <SingletonPartition />
+      </StatelessService>
+    </Service>
+    <Service Name="ActivitiesApi" ServicePackageActivationMode="ExclusiveProcess">
+      <StatelessService ServiceTypeName="ActivitiesApiType" InstanceCount="[ActivitiesApi_InstanceCount]">
         <SingletonPartition />
       </StatelessService>
     </Service>

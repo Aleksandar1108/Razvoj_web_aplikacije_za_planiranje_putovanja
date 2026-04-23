@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { TravelActivityFormPage } from './pages/TravelActivityFormPage';
 import { TravelPlanDetailPage } from './pages/TravelPlanDetailPage';
 import { TravelDestinationFormPage } from './pages/TravelDestinationFormPage';
 import { TravelPlanFormPage } from './pages/TravelPlanFormPage';
@@ -24,6 +25,8 @@ export default function App() {
             <Route path="/plans/:planId/edit" element={<TravelPlanFormPage />} />
             <Route path="/plans/:planId/destinations/new" element={<TravelDestinationFormPage />} />
             <Route path="/plans/:planId/destinations/:destinationId/edit" element={<TravelDestinationFormPage />} />
+            <Route path="/plans/:planId/activities/new" element={<TravelActivityFormPage />} />
+            <Route path="/plans/:planId/activities/:activityId/edit" element={<TravelActivityFormPage />} />
             <Route path="/plans/:planId" element={<TravelPlanDetailPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

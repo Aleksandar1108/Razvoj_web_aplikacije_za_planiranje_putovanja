@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { deleteTravelPlan, getTravelPlan } from '../services/travelPlansService';
 import { deleteDestination, listDestinations } from '../services/destinationsService';
+import { deleteActivity, listActivities } from '../services/activitiesService';
 import type { TravelPlan } from '../models/travelPlan';
 import type { TravelDestination } from '../models/travelDestination';
+import type { TravelActivity } from '../models/travelActivity';
 import { ApiError } from '../services/httpClient';
 
 function formatDate(iso: string): string {
@@ -36,18 +38,59 @@ function formatBudget(value: number): string {
   return new Intl.NumberFormat('sr-Latn', { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(value);
 }
 
+function formatTime(value: string): string {
+  return value?.slice(0, 5) ?? value;
+}
+
+function formatStatus(status: string): string {
+  if (status === 'planned') return 'Planirano';
+  if (status === 'reserved') return 'Rezervisano';
+  if (status === 'completed') return 'Završeno';
+  if (status === 'cancelled') return 'Otkazano';
+  return status;
+}
+
+function statusClass(status: string): string {
+  return `activity-status activity-status-${status}`;
+}
+
+function parseDateOnly(iso: string): Date {
+  return new Date(`${iso}T12:00:00`);
+}
+
+function toIsoDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function monthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 export function TravelPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   const { accessToken } = useAuth();
   const [plan, setPlan] = useState<TravelPlan | null>(null);
   const [destinations, setDestinations] = useState<TravelDestination[]>([]);
+  const [activities, setActivities] = useState<TravelActivity[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [destError, setDestError] = useState<string | null>(null);
+  const [actError, setActError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletingDestId, setDeletingDestId] = useState<string | null>(null);
+  const [deletingActId, setDeletingActId] = useState<string | null>(null);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
 
   useEffect(() => {
     if (!planId) return;
@@ -56,6 +99,7 @@ export function TravelPlanDetailPage() {
       setLoading(true);
       setError(null);
       setDestError(null);
+      setActError(null);
       try {
         const p = await getTravelPlan(planId, accessToken);
         if (cancelled) return;
@@ -69,11 +113,21 @@ export function TravelPlanDetailPage() {
             setDestError(de instanceof ApiError ? de.message : 'Destinacije nisu učitane.');
           }
         }
+        try {
+          const a = await listActivities(planId, accessToken);
+          if (!cancelled) setActivities(a);
+        } catch (ae) {
+          if (!cancelled) {
+            setActivities([]);
+            setActError(ae instanceof ApiError ? ae.message : 'Aktivnosti nisu učitane.');
+          }
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : 'Plan nije pronađen.');
           setPlan(null);
           setDestinations([]);
+          setActivities([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,6 +168,21 @@ export function TravelPlanDetailPage() {
     }
   }
 
+  async function onDeleteActivity(activityId: string) {
+    if (!planId) return;
+    if (!window.confirm('Obrisati ovu aktivnost?')) return;
+    setDeletingActId(activityId);
+    setActError(null);
+    try {
+      await deleteActivity(planId, activityId, accessToken);
+      setActivities((prev) => prev.filter((x) => x.id !== activityId));
+    } catch (e) {
+      setActError(e instanceof ApiError ? e.message : 'Brisanje aktivnosti nije uspjelo.');
+    } finally {
+      setDeletingActId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="page plan-detail-page">
@@ -136,6 +205,26 @@ export function TravelPlanDetailPage() {
   }
 
   if (!plan) return null;
+
+  const activitiesByDate = activities.reduce<Record<string, TravelActivity[]>>((acc, item) => {
+    if (!acc[item.activityDate]) acc[item.activityDate] = [];
+    acc[item.activityDate].push(item);
+    return acc;
+  }, {});
+
+  const groupedDates = Object.keys(activitiesByDate).sort((a, b) => a.localeCompare(b));
+  const selectedDayActivities = selectedCalendarDate ? (activitiesByDate[selectedCalendarDate] ?? []) : [];
+  const planStart = parseDateOnly(plan.startDate);
+  const planEnd = parseDateOnly(plan.endDate);
+  const calendarMonths: Date[] = [];
+  {
+    const cursor = monthStart(planStart);
+    const last = monthStart(planEnd);
+    while (cursor <= last) {
+      calendarMonths.push(new Date(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
 
   return (
     <div className="page plan-detail-page">
@@ -236,6 +325,153 @@ export function TravelPlanDetailPage() {
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="card plan-detail-panel wide destination-panel">
+          <div className="destination-panel-head">
+            <h2>Aktivnosti po danima</h2>
+            <Link to={`/plans/${plan.id}/activities/new`} className="btn btn-glow primary btn-sm">
+              Nova aktivnost
+            </Link>
+          </div>
+          {actError ? <p className="error small">{actError}</p> : null}
+          {groupedDates.length === 0 ? (
+            <p className="muted">Još nema aktivnosti za ovaj plan.</p>
+          ) : (
+            <div className="activity-day-list">
+              {groupedDates.map((day) => (
+                <div key={day} className="activity-day-group">
+                  <p className="activity-day-title">{formatDate(day)}</p>
+                  <ul className="destination-list">
+                    {activitiesByDate[day].map((a) => (
+                      <li key={a.id} className="destination-item glass-panel">
+                        <div className="destination-item-main">
+                          <p className="destination-name">
+                            {formatTime(a.activityTime)} · {a.name}
+                          </p>
+                          <p className="destination-location muted small">{a.location}</p>
+                          <p className="destination-notes small">{a.description ?? 'Bez opisa'}</p>
+                          <p className="small">
+                            Procenjeni trošak: <strong>{formatBudget(a.estimatedCost)}</strong> EUR
+                            {' · '}
+                            <span className={statusClass(a.status)}>{formatStatus(a.status)}</span>
+                          </p>
+                        </div>
+                        <div className="destination-item-actions">
+                          <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
+                            Izmeni
+                          </Link>
+                          <button
+                            type="button"
+                            className="btn danger ghost btn-sm"
+                            disabled={deletingActId === a.id}
+                            onClick={() => onDeleteActivity(a.id)}
+                          >
+                            {deletingActId === a.id ? 'Brišem…' : 'Obriši'}
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="card plan-detail-panel wide">
+          <h2>Kalendar aktivnosti</h2>
+          {calendarMonths.map((monthDate) => {
+            const firstDay = monthStart(monthDate);
+            const firstWeekday = (firstDay.getDay() + 6) % 7;
+            const gridStart = addDays(firstDay, -firstWeekday);
+            const cells = Array.from({ length: 42 }, (_, idx) => {
+              const day = addDays(gridStart, idx);
+              const iso = toIsoDate(day);
+              return {
+                iso,
+                inMonth: day.getMonth() === monthDate.getMonth(),
+                items: activitiesByDate[iso] ?? [],
+              };
+            });
+
+            return (
+              <div key={monthDate.toISOString()} className="calendar-month">
+                <p className="calendar-month-title">
+                  {monthDate.toLocaleDateString('sr-Latn', { month: 'long', year: 'numeric' })}
+                </p>
+                <div className="calendar-weekdays">
+                  <span>Pon</span>
+                  <span>Uto</span>
+                  <span>Sre</span>
+                  <span>Čet</span>
+                  <span>Pet</span>
+                  <span>Sub</span>
+                  <span>Ned</span>
+                </div>
+                <div className="calendar-grid">
+                  {cells.map((cell) => (
+                    <button
+                      key={cell.iso}
+                      type="button"
+                      className={`calendar-cell${cell.inMonth ? '' : ' muted-cell'}${cell.items.length ? ' has-items' : ''}${
+                        selectedCalendarDate === cell.iso ? ' selected' : ''
+                      }`}
+                      onClick={() => setSelectedCalendarDate(cell.iso)}
+                    >
+                      <p className="calendar-day-number">{Number(cell.iso.slice(8, 10))}</p>
+                      {cell.items.length > 0 ? (
+                        <ul className="calendar-items">
+                          {cell.items.slice(0, 2).map((item) => (
+                            <li key={item.id}>
+                              {formatTime(item.activityTime)} {item.name}
+                            </li>
+                          ))}
+                          {cell.items.length > 2 ? <li>+{cell.items.length - 2} još</li> : null}
+                        </ul>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {selectedCalendarDate ? (
+            <div className="calendar-popover" role="dialog" aria-modal="false" aria-label="Aktivnosti za izabrani datum">
+              <div className="calendar-popover-header">
+                <p className="calendar-selected-title">Aktivnosti za {formatDate(selectedCalendarDate)}</p>
+                <button type="button" className="btn ghost btn-sm" onClick={() => setSelectedCalendarDate(null)}>
+                  Zatvori
+                </button>
+              </div>
+              {selectedDayActivities.length > 0 ? (
+                <ul className="calendar-popover-list">
+                  {selectedDayActivities
+                    .slice()
+                    .sort((a, b) => a.activityTime.localeCompare(b.activityTime))
+                    .map((a) => (
+                      <li key={a.id} className="calendar-popover-item">
+                        <p className="destination-name">
+                          {formatTime(a.activityTime)} · {a.name}
+                        </p>
+                        <p className="destination-location muted small">{a.location}</p>
+                        <p className="destination-notes small">{a.description ?? 'Bez opisa'}</p>
+                        <p className="small">
+                          Procenjeni trošak: <strong>{formatBudget(a.estimatedCost)}</strong> EUR
+                          {' · '}
+                          <span className={statusClass(a.status)}>{formatStatus(a.status)}</span>
+                        </p>
+                        <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
+                          Izmeni
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="muted small">Nema aktivnosti za izabrani datum.</p>
+              )}
+            </div>
+          ) : null}
         </section>
 
         <section className="card plan-detail-panel wide">
