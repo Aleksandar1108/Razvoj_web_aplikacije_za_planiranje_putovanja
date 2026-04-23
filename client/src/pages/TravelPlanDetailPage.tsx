@@ -11,6 +11,8 @@ import type { TravelActivity } from '../models/travelActivity';
 import type { ExpenseSummary, TravelExpense } from '../models/travelExpense';
 import { ApiError } from '../services/httpClient';
 
+type PlanSection = 'osnovno' | 'destinacije' | 'troskovi' | 'aktivnosti' | 'kalendar' | 'napomene';
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso + 'T12:00:00').toLocaleDateString('sr-Latn', {
@@ -120,6 +122,7 @@ export function TravelPlanDetailPage() {
   const [deletingActId, setDeletingActId] = useState<string | null>(null);
   const [deletingExpId, setDeletingExpId] = useState<string | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<PlanSection>('osnovno');
 
   useEffect(() => {
     if (!planId) return;
@@ -330,15 +333,6 @@ export function TravelPlanDetailPage() {
         </div>
       ) : null}
 
-      <nav className="plan-sections-nav card" aria-label="Sekcije plana">
-        <a href="#sekcija-osnovno">Osnovno</a>
-        <a href="#sekcija-destinacije">Destinacije</a>
-        <a href="#sekcija-troskovi">Troškovi i budžet</a>
-        <a href="#sekcija-aktivnosti">Aktivnosti</a>
-        <a href="#sekcija-kalendar">Kalendar</a>
-        <a href="#sekcija-napomene">Napomene</a>
-      </nav>
-
       <section className="plan-overview-strip">
         <article className="plan-overview-card card">
           <p className="muted small">Period</p>
@@ -360,28 +354,33 @@ export function TravelPlanDetailPage() {
         </article>
       </section>
 
-      <div className="plan-detail-layout">
-        <section id="sekcija-osnovno" className="card plan-detail-panel">
-          <h2>Datumi</h2>
-          <dl className="detail-dl">
-            <div>
-              <dt>Početak</dt>
-              <dd>{formatDate(plan.startDate)}</dd>
-            </div>
-            <div>
-              <dt>Kraj</dt>
-              <dd>{formatDate(plan.endDate)}</dd>
-            </div>
-          </dl>
-        </section>
+      <div className="plan-workspace-layout">
+        <div className="plan-workspace-content">
+          {activeSection === 'osnovno' ? (
+            <>
+              <section id="sekcija-osnovno" className="card plan-detail-panel">
+                <h2>Datumi</h2>
+                <dl className="detail-dl">
+                  <div>
+                    <dt>Početak</dt>
+                    <dd>{formatDate(plan.startDate)}</dd>
+                  </div>
+                  <div>
+                    <dt>Kraj</dt>
+                    <dd>{formatDate(plan.endDate)}</dd>
+                  </div>
+                </dl>
+              </section>
+              <section className="card plan-detail-panel accent">
+                <h2>Budžet</h2>
+                <p className="plan-detail-budget">{formatBudget(plan.plannedBudget)} EUR</p>
+                <p className="muted small">Planirani budžet putovanja.</p>
+              </section>
+            </>
+          ) : null}
 
-        <section className="card plan-detail-panel accent">
-          <h2>Budžet</h2>
-          <p className="plan-detail-budget">{formatBudget(plan.plannedBudget)} EUR</p>
-          <p className="muted small">Planirani budžet putovanja.</p>
-        </section>
-
-        <section id="sekcija-destinacije" className="card plan-detail-panel wide destination-panel">
+          {activeSection === 'destinacije' ? (
+            <section id="sekcija-destinacije" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Destinacije</h2>
             <Link to={`/plans/${plan.id}/destinations/new`} className="btn btn-glow primary btn-sm">
@@ -420,9 +419,11 @@ export function TravelPlanDetailPage() {
               ))}
             </ul>
           )}
-        </section>
+            </section>
+          ) : null}
 
-        <section id="sekcija-troskovi" className="card plan-detail-panel wide destination-panel">
+          {activeSection === 'troskovi' ? (
+            <section id="sekcija-troskovi" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Troškovi i budžet</h2>
             <Link to={`/plans/${plan.id}/expenses/new`} className="btn btn-glow primary btn-sm">
@@ -485,9 +486,11 @@ export function TravelPlanDetailPage() {
               ))}
             </ul>
           )}
-        </section>
+            </section>
+          ) : null}
 
-        <section id="sekcija-aktivnosti" className="card plan-detail-panel wide destination-panel">
+          {activeSection === 'aktivnosti' ? (
+            <section id="sekcija-aktivnosti" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Aktivnosti po danima</h2>
             <Link to={`/plans/${plan.id}/activities/new`} className="btn btn-glow primary btn-sm">
@@ -537,9 +540,11 @@ export function TravelPlanDetailPage() {
               ))}
             </div>
           )}
-        </section>
+            </section>
+          ) : null}
 
-        <section id="sekcija-kalendar" className="card plan-detail-panel wide">
+          {activeSection === 'kalendar' ? (
+            <section id="sekcija-kalendar" className="card plan-detail-panel wide">
           <h2>Kalendar aktivnosti</h2>
           {calendarMonths.map((monthDate) => {
             const firstDay = monthStart(monthDate);
@@ -632,23 +637,49 @@ export function TravelPlanDetailPage() {
               )}
             </div>
           ) : null}
-        </section>
+            </section>
+          ) : null}
 
-        <section id="sekcija-napomene" className="card plan-detail-panel wide">
-          <h2>Napomene</h2>
-          {plan.generalNotes?.trim() ? (
-            <p className="plan-notes">{plan.generalNotes}</p>
-          ) : (
-            <p className="muted">Nema unesenih napomena.</p>
-          )}
-        </section>
+          {activeSection === 'napomene' ? (
+            <section id="sekcija-napomene" className="card plan-detail-panel wide">
+              <h2>Napomene</h2>
+              {plan.generalNotes?.trim() ? (
+                <p className="plan-notes">{plan.generalNotes}</p>
+              ) : (
+                <p className="muted">Nema unesenih napomena.</p>
+              )}
+            </section>
+          ) : null}
 
-        <section className="card plan-detail-panel meta">
-          <p className="muted small">
-            Kreirano: {new Date(plan.createdAtUtc).toLocaleString('sr-Latn')} · Zadnja izmena:{' '}
-            {new Date(plan.updatedAtUtc).toLocaleString('sr-Latn')}
-          </p>
-        </section>
+          <section className="card plan-detail-panel meta">
+            <p className="muted small">
+              Kreirano: {new Date(plan.createdAtUtc).toLocaleString('sr-Latn')} · Zadnja izmena:{' '}
+              {new Date(plan.updatedAtUtc).toLocaleString('sr-Latn')}
+            </p>
+          </section>
+        </div>
+
+        <aside className="plan-workspace-menu card" aria-label="Meni funkcionalnosti plana">
+          <p className="workspace-menu-title">Meni plana</p>
+          <button type="button" className={`workspace-menu-item${activeSection === 'osnovno' ? ' active' : ''}`} onClick={() => setActiveSection('osnovno')}>
+            Osnovno
+          </button>
+          <button type="button" className={`workspace-menu-item${activeSection === 'destinacije' ? ' active' : ''}`} onClick={() => setActiveSection('destinacije')}>
+            Destinacije
+          </button>
+          <button type="button" className={`workspace-menu-item${activeSection === 'troskovi' ? ' active' : ''}`} onClick={() => setActiveSection('troskovi')}>
+            Troškovi i budžet
+          </button>
+          <button type="button" className={`workspace-menu-item${activeSection === 'aktivnosti' ? ' active' : ''}`} onClick={() => setActiveSection('aktivnosti')}>
+            Aktivnosti po danima
+          </button>
+          <button type="button" className={`workspace-menu-item${activeSection === 'kalendar' ? ' active' : ''}`} onClick={() => setActiveSection('kalendar')}>
+            Kalendar aktivnosti
+          </button>
+          <button type="button" className={`workspace-menu-item${activeSection === 'napomene' ? ' active' : ''}`} onClick={() => setActiveSection('napomene')}>
+            Napomene
+          </button>
+        </aside>
       </div>
     </div>
   );

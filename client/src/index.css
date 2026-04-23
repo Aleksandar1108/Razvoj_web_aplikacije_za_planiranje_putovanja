@@ -1016,6 +1016,58 @@ h1 {
   z-index: 10;
 }
 
+.plan-workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.plan-workspace-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.plan-workspace-menu {
+  position: sticky;
+  top: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.workspace-menu-title {
+  margin: 0 0 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.workspace-menu-item {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.72);
+  color: #1e293b;
+  border-radius: 10px;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workspace-menu-item.active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(14, 165, 233, 0.95));
+  border-color: rgba(191, 219, 254, 0.82);
+  color: #fff;
+}
+
+.workspace-menu-item:hover:not(.active) {
+  border-color: rgba(37, 99, 235, 0.5);
+}
+
 .plan-sections-nav a {
   text-decoration: none;
   font-size: 0.85rem;
@@ -1407,5 +1459,16 @@ h1 {
     bottom: 0.75rem;
     width: auto;
     max-height: 62vh;
+  }
+}
+
+@media (max-width: 980px) {
+  .plan-workspace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-workspace-menu {
+    position: static;
+    order: -1;
   }
 }
