@@ -1,6 +1,7 @@
 .vs/
 **/bin/
 **/obj/
+**/pkg/
 node_modules/
 client/.vite/
 npm-debug.log*

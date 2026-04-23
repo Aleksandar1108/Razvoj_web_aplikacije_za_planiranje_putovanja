@@ -4,9 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { deleteTravelPlan, getTravelPlan } from '../services/travelPlansService';
 import { deleteDestination, listDestinations } from '../services/destinationsService';
 import { deleteActivity, listActivities } from '../services/activitiesService';
+import { deleteExpense, getExpenseSummary, listExpenses } from '../services/expensesService';
 import type { TravelPlan } from '../models/travelPlan';
 import type { TravelDestination } from '../models/travelDestination';
 import type { TravelActivity } from '../models/travelActivity';
+import type { ExpenseSummary, TravelExpense } from '../models/travelExpense';
 import { ApiError } from '../services/httpClient';
 
 function formatDate(iso: string): string {
@@ -54,6 +56,29 @@ function statusClass(status: string): string {
   return `activity-status activity-status-${status}`;
 }
 
+function categoryLabel(category: string): string {
+  if (category === 'transport') return 'Prevoz';
+  if (category === 'accommodation') return 'Smeštaj';
+  if (category === 'food') return 'Hrana';
+  if (category === 'tickets') return 'Ulaznice';
+  if (category === 'shopping') return 'Kupovina';
+  if (category === 'other') return 'Ostalo';
+  return category;
+}
+
+function buildSummary(plannedBudget: number, expenses: TravelExpense[], activities: TravelActivity[]): ExpenseSummary {
+  const totalExpenseEntries = expenses.reduce((sum, item) => sum + item.amount, 0);
+  const totalActivityEstimatedCosts = activities.reduce((sum, item) => sum + item.estimatedCost, 0);
+  const totalExpenses = totalExpenseEntries + totalActivityEstimatedCosts;
+  return {
+    plannedBudget,
+    totalExpenses,
+    totalExpenseEntries,
+    totalActivityEstimatedCosts,
+    remainingBudget: plannedBudget - totalExpenses,
+  };
+}
+
 function parseDateOnly(iso: string): Date {
   return new Date(`${iso}T12:00:00`);
 }
@@ -82,14 +107,18 @@ export function TravelPlanDetailPage() {
   const [plan, setPlan] = useState<TravelPlan | null>(null);
   const [destinations, setDestinations] = useState<TravelDestination[]>([]);
   const [activities, setActivities] = useState<TravelActivity[]>([]);
+  const [expenses, setExpenses] = useState<TravelExpense[]>([]);
+  const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [destError, setDestError] = useState<string | null>(null);
   const [actError, setActError] = useState<string | null>(null);
+  const [expError, setExpError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletingDestId, setDeletingDestId] = useState<string | null>(null);
   const [deletingActId, setDeletingActId] = useState<string | null>(null);
+  const [deletingExpId, setDeletingExpId] = useState<string | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,6 +129,7 @@ export function TravelPlanDetailPage() {
       setError(null);
       setDestError(null);
       setActError(null);
+      setExpError(null);
       try {
         const p = await getTravelPlan(planId, accessToken);
         if (cancelled) return;
@@ -122,12 +152,26 @@ export function TravelPlanDetailPage() {
             setActError(ae instanceof ApiError ? ae.message : 'Aktivnosti nisu učitane.');
           }
         }
+        try {
+          const e = await listExpenses(planId, accessToken);
+          if (!cancelled) setExpenses(e);
+          const s = await getExpenseSummary(planId, accessToken);
+          if (!cancelled) setExpenseSummary(s);
+        } catch (ee) {
+          if (!cancelled) {
+            setExpenses([]);
+            setExpenseSummary(null);
+            setExpError(ee instanceof ApiError ? ee.message : 'Troškovi nisu učitani.');
+          }
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : 'Plan nije pronađen.');
           setPlan(null);
           setDestinations([]);
           setActivities([]);
+          setExpenses([]);
+          setExpenseSummary(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -175,11 +219,32 @@ export function TravelPlanDetailPage() {
     setActError(null);
     try {
       await deleteActivity(planId, activityId, accessToken);
-      setActivities((prev) => prev.filter((x) => x.id !== activityId));
+      const nextActivities = activities.filter((x) => x.id !== activityId);
+      setActivities(nextActivities);
+      const plannedBudget = plan?.plannedBudget ?? 0;
+      setExpenseSummary(buildSummary(plannedBudget, expenses, nextActivities));
     } catch (e) {
       setActError(e instanceof ApiError ? e.message : 'Brisanje aktivnosti nije uspjelo.');
     } finally {
       setDeletingActId(null);
+    }
+  }
+
+  async function onDeleteExpense(expenseId: string) {
+    if (!planId) return;
+    if (!window.confirm('Obrisati ovaj trošak?')) return;
+    setDeletingExpId(expenseId);
+    setExpError(null);
+    try {
+      await deleteExpense(planId, expenseId, accessToken);
+      const next = expenses.filter((x) => x.id !== expenseId);
+      setExpenses(next);
+      const plannedBudget = plan?.plannedBudget ?? 0;
+      setExpenseSummary(buildSummary(plannedBudget, next, activities));
+    } catch (e) {
+      setExpError(e instanceof ApiError ? e.message : 'Brisanje troška nije uspelo.');
+    } finally {
+      setDeletingExpId(null);
     }
   }
 
@@ -282,8 +347,8 @@ export function TravelPlanDetailPage() {
 
         <section className="card plan-detail-panel accent">
           <h2>Budžet</h2>
-          <p className="plan-detail-budget">{formatBudget(plan.plannedBudget)}</p>
-          <p className="muted small">Iznos je informativan; kasnije možeš vezati troškove.</p>
+          <p className="plan-detail-budget">{formatBudget(plan.plannedBudget)} EUR</p>
+          <p className="muted small">Planirani budžet putovanja.</p>
         </section>
 
         <section className="card plan-detail-panel wide destination-panel">
@@ -319,6 +384,71 @@ export function TravelPlanDetailPage() {
                       onClick={() => onDeleteDestination(d.id)}
                     >
                       {deletingDestId === d.id ? 'Brišem…' : 'Obriši'}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="card plan-detail-panel wide destination-panel">
+          <div className="destination-panel-head">
+            <h2>Troškovi i budžet</h2>
+            <Link to={`/plans/${plan.id}/expenses/new`} className="btn btn-glow primary btn-sm">
+              Novi trošak
+            </Link>
+          </div>
+          {expError ? <p className="error small">{expError}</p> : null}
+          <div className="expense-summary-grid">
+            <div className="expense-summary-box">
+              <p className="muted small">Planirani budžet</p>
+              <p className="expense-summary-value">{formatBudget(expenseSummary?.plannedBudget ?? plan.plannedBudget)} EUR</p>
+            </div>
+            <div className="expense-summary-box">
+              <p className="muted small">Ukupno potrošeno</p>
+              <p className="expense-summary-value">{formatBudget(expenseSummary?.totalExpenses ?? 0)} EUR</p>
+            </div>
+            <div className="expense-summary-box">
+              <p className="muted small">Troškovi (stavke)</p>
+              <p className="expense-summary-value">{formatBudget(expenseSummary?.totalExpenseEntries ?? 0)} EUR</p>
+            </div>
+            <div className="expense-summary-box">
+              <p className="muted small">Aktivnosti (procenjeno)</p>
+              <p className="expense-summary-value">{formatBudget(expenseSummary?.totalActivityEstimatedCosts ?? 0)} EUR</p>
+            </div>
+            <div className="expense-summary-box">
+              <p className="muted small">Preostali budžet</p>
+              <p className="expense-summary-value">{formatBudget(expenseSummary?.remainingBudget ?? plan.plannedBudget)} EUR</p>
+            </div>
+          </div>
+          {expenses.length === 0 ? (
+            <p className="muted">Još nema evidentiranih troškova.</p>
+          ) : (
+            <ul className="destination-list">
+              {expenses.map((e) => (
+                <li key={e.id} className="destination-item glass-panel">
+                  <div className="destination-item-main">
+                    <p className="destination-name">{e.name}</p>
+                    <p className="destination-location muted small">
+                      {categoryLabel(e.category)} · {formatShortDate(e.expenseDate)}
+                    </p>
+                    <p className="small">
+                      Iznos: <strong>{formatBudget(e.amount)} EUR</strong>
+                    </p>
+                    <p className="destination-notes small">{e.description ?? 'Bez opisa'}</p>
+                  </div>
+                  <div className="destination-item-actions">
+                    <Link to={`/plans/${plan.id}/expenses/${e.id}/edit`} className="btn ghost btn-sm">
+                      Izmeni
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn danger ghost btn-sm"
+                      disabled={deletingExpId === e.id}
+                      onClick={() => onDeleteExpense(e.id)}
+                    >
+                      {deletingExpId === e.id ? 'Brišem…' : 'Obriši'}
                     </button>
                   </div>
                 </li>

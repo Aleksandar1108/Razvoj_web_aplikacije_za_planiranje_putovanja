@@ -9,6 +9,8 @@
     <Parameter Name="DestinationsApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=DestinationsApi-PlaniranjePutovanja" />
     <Parameter Name="ActivitiesApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
     <Parameter Name="ActivitiesApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ActivitiesApi-PlaniranjePutovanja" />
+    <Parameter Name="ExpensesApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
+    <Parameter Name="ExpensesApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ExpensesApi-PlaniranjePutovanja" />
   </Parameters>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="Web1Pkg" ServiceManifestVersion="1.0.0" />
@@ -40,6 +42,14 @@
     <EnvironmentOverrides CodePackageRef="code">
       <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[ActivitiesApi_ASPNETCORE_ENVIRONMENT]" />
       <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[ActivitiesApi_DefaultConnection]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="ExpensesApiPkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[ExpensesApi_ASPNETCORE_ENVIRONMENT]" />
+      <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[ExpensesApi_DefaultConnection]" />
     </EnvironmentOverrides>
   </ServiceManifestImport>
 </ApplicationManifest>

@@ -5,6 +5,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { TravelActivityFormPage } from './pages/TravelActivityFormPage';
+import { TravelExpenseFormPage } from './pages/TravelExpenseFormPage';
 import { TravelPlanDetailPage } from './pages/TravelPlanDetailPage';
 import { TravelDestinationFormPage } from './pages/TravelDestinationFormPage';
 import { TravelPlanFormPage } from './pages/TravelPlanFormPage';
@@ -27,6 +28,8 @@ export default function App() {
             <Route path="/plans/:planId/destinations/:destinationId/edit" element={<TravelDestinationFormPage />} />
             <Route path="/plans/:planId/activities/new" element={<TravelActivityFormPage />} />
             <Route path="/plans/:planId/activities/:activityId/edit" element={<TravelActivityFormPage />} />
+            <Route path="/plans/:planId/expenses/new" element={<TravelExpenseFormPage />} />
+            <Route path="/plans/:planId/expenses/:expenseId/edit" element={<TravelExpenseFormPage />} />
             <Route path="/plans/:planId" element={<TravelPlanDetailPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

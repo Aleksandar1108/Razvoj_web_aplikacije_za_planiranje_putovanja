@@ -25,3 +25,10 @@ export function getActivitiesApiBaseUrl(): string {
   const trimmed = (raw ?? '').trim().replace(/\/$/, '');
   return trimmed;
 }
+
+/** Mikroservis troškova i budžeta (ExpensesApi / ServiceManifest — port 8920). */
+export function getExpensesApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_EXPENSES_API_BASE_URL as string | undefined;
+  const trimmed = (raw ?? '').trim().replace(/\/$/, '');
+  return trimmed;
+}
