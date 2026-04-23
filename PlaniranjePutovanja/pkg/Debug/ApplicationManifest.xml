@@ -5,6 +5,8 @@
     <Parameter Name="Web1_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=Web1-PlaniranjePutovanja" />
     <Parameter Name="TravelPlansApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
     <Parameter Name="TravelPlansApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=TravelPlansApi-PlaniranjePutovanja" />
+    <Parameter Name="DestinationsApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
+    <Parameter Name="DestinationsApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=DestinationsApi-PlaniranjePutovanja" />
   </Parameters>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="Web1Pkg" ServiceManifestVersion="1.0.0" />
@@ -20,6 +22,14 @@
     <EnvironmentOverrides CodePackageRef="code">
       <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[TravelPlansApi_ASPNETCORE_ENVIRONMENT]" />
       <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[TravelPlansApi_DefaultConnection]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="DestinationsApiPkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[DestinationsApi_ASPNETCORE_ENVIRONMENT]" />
+      <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[DestinationsApi_DefaultConnection]" />
     </EnvironmentOverrides>
   </ServiceManifestImport>
 </ApplicationManifest>
