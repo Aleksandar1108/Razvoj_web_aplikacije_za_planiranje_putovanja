@@ -330,8 +330,38 @@ export function TravelPlanDetailPage() {
         </div>
       ) : null}
 
+      <nav className="plan-sections-nav card" aria-label="Sekcije plana">
+        <a href="#sekcija-osnovno">Osnovno</a>
+        <a href="#sekcija-destinacije">Destinacije</a>
+        <a href="#sekcija-troskovi">Troškovi i budžet</a>
+        <a href="#sekcija-aktivnosti">Aktivnosti</a>
+        <a href="#sekcija-kalendar">Kalendar</a>
+        <a href="#sekcija-napomene">Napomene</a>
+      </nav>
+
+      <section className="plan-overview-strip">
+        <article className="plan-overview-card card">
+          <p className="muted small">Period</p>
+          <p className="overview-value">
+            {formatShortDate(plan.startDate)} - {formatShortDate(plan.endDate)}
+          </p>
+        </article>
+        <article className="plan-overview-card card">
+          <p className="muted small">Destinacije</p>
+          <p className="overview-value">{destinations.length}</p>
+        </article>
+        <article className="plan-overview-card card">
+          <p className="muted small">Aktivnosti</p>
+          <p className="overview-value">{activities.length}</p>
+        </article>
+        <article className="plan-overview-card card">
+          <p className="muted small">Troškovi (stavke)</p>
+          <p className="overview-value">{expenses.length}</p>
+        </article>
+      </section>
+
       <div className="plan-detail-layout">
-        <section className="card plan-detail-panel">
+        <section id="sekcija-osnovno" className="card plan-detail-panel">
           <h2>Datumi</h2>
           <dl className="detail-dl">
             <div>
@@ -351,7 +381,7 @@ export function TravelPlanDetailPage() {
           <p className="muted small">Planirani budžet putovanja.</p>
         </section>
 
-        <section className="card plan-detail-panel wide destination-panel">
+        <section id="sekcija-destinacije" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Destinacije</h2>
             <Link to={`/plans/${plan.id}/destinations/new`} className="btn btn-glow primary btn-sm">
@@ -392,7 +422,7 @@ export function TravelPlanDetailPage() {
           )}
         </section>
 
-        <section className="card plan-detail-panel wide destination-panel">
+        <section id="sekcija-troskovi" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Troškovi i budžet</h2>
             <Link to={`/plans/${plan.id}/expenses/new`} className="btn btn-glow primary btn-sm">
@@ -457,7 +487,7 @@ export function TravelPlanDetailPage() {
           )}
         </section>
 
-        <section className="card plan-detail-panel wide destination-panel">
+        <section id="sekcija-aktivnosti" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Aktivnosti po danima</h2>
             <Link to={`/plans/${plan.id}/activities/new`} className="btn btn-glow primary btn-sm">
@@ -509,7 +539,7 @@ export function TravelPlanDetailPage() {
           )}
         </section>
 
-        <section className="card plan-detail-panel wide">
+        <section id="sekcija-kalendar" className="card plan-detail-panel wide">
           <h2>Kalendar aktivnosti</h2>
           {calendarMonths.map((monthDate) => {
             const firstDay = monthStart(monthDate);
@@ -604,7 +634,7 @@ export function TravelPlanDetailPage() {
           ) : null}
         </section>
 
-        <section className="card plan-detail-panel wide">
+        <section id="sekcija-napomene" className="card plan-detail-panel wide">
           <h2>Napomene</h2>
           {plan.generalNotes?.trim() ? (
             <p className="plan-notes">{plan.generalNotes}</p>
