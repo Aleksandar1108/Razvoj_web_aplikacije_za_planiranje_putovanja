@@ -5,13 +5,15 @@ import { deleteTravelPlan, getTravelPlan } from '../services/travelPlansService'
 import { deleteDestination, listDestinations } from '../services/destinationsService';
 import { deleteActivity, listActivities } from '../services/activitiesService';
 import { deleteExpense, getExpenseSummary, listExpenses } from '../services/expensesService';
+import { createChecklistItem, deleteChecklistItem, listChecklistItems, toggleChecklistItem } from '../services/checklistService';
 import type { TravelPlan } from '../models/travelPlan';
 import type { TravelDestination } from '../models/travelDestination';
 import type { TravelActivity } from '../models/travelActivity';
 import type { ExpenseSummary, TravelExpense } from '../models/travelExpense';
+import type { ChecklistItem } from '../models/checklistItem';
 import { ApiError } from '../services/httpClient';
 
-type PlanSection = 'osnovno' | 'destinacije' | 'troskovi' | 'aktivnosti' | 'kalendar' | 'napomene';
+type PlanSection = 'osnovno' | 'destinacije' | 'troskovi' | 'aktivnosti' | 'kalendar' | 'checklista' | 'napomene';
 
 function formatDate(iso: string): string {
   try {
@@ -110,19 +112,24 @@ export function TravelPlanDetailPage() {
   const [destinations, setDestinations] = useState<TravelDestination[]>([]);
   const [activities, setActivities] = useState<TravelActivity[]>([]);
   const [expenses, setExpenses] = useState<TravelExpense[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [destError, setDestError] = useState<string | null>(null);
   const [actError, setActError] = useState<string | null>(null);
   const [expError, setExpError] = useState<string | null>(null);
+  const [checklistError, setChecklistError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletingDestId, setDeletingDestId] = useState<string | null>(null);
   const [deletingActId, setDeletingActId] = useState<string | null>(null);
   const [deletingExpId, setDeletingExpId] = useState<string | null>(null);
+  const [deletingChecklistId, setDeletingChecklistId] = useState<string | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<PlanSection>('osnovno');
+  const [newChecklistTitle, setNewChecklistTitle] = useState('');
+  const [addingChecklist, setAddingChecklist] = useState(false);
 
   useEffect(() => {
     if (!planId) return;
@@ -133,6 +140,7 @@ export function TravelPlanDetailPage() {
       setDestError(null);
       setActError(null);
       setExpError(null);
+      setChecklistError(null);
       try {
         const p = await getTravelPlan(planId, accessToken);
         if (cancelled) return;
@@ -167,6 +175,15 @@ export function TravelPlanDetailPage() {
             setExpError(ee instanceof ApiError ? ee.message : 'Troškovi nisu učitani.');
           }
         }
+        try {
+          const items = await listChecklistItems(planId, accessToken);
+          if (!cancelled) setChecklistItems(items);
+        } catch (ce) {
+          if (!cancelled) {
+            setChecklistItems([]);
+            setChecklistError(ce instanceof ApiError ? ce.message : 'Checklist nije učitan.');
+          }
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : 'Plan nije pronađen.');
@@ -174,6 +191,7 @@ export function TravelPlanDetailPage() {
           setDestinations([]);
           setActivities([]);
           setExpenses([]);
+          setChecklistItems([]);
           setExpenseSummary(null);
         }
       } finally {
@@ -248,6 +266,52 @@ export function TravelPlanDetailPage() {
       setExpError(e instanceof ApiError ? e.message : 'Brisanje troška nije uspelo.');
     } finally {
       setDeletingExpId(null);
+    }
+  }
+
+  async function onAddChecklistItem() {
+    if (!planId) return;
+    const title = newChecklistTitle.trim();
+    if (!title) return;
+    setAddingChecklist(true);
+    setChecklistError(null);
+    try {
+      const created = await createChecklistItem(planId, { title }, accessToken);
+      setChecklistItems((prev) => [...prev, created].sort((a, b) => Number(a.isDone) - Number(b.isDone)));
+      setNewChecklistTitle('');
+    } catch (e) {
+      setChecklistError(e instanceof ApiError ? e.message : 'Dodavanje stavke nije uspelo.');
+    } finally {
+      setAddingChecklist(false);
+    }
+  }
+
+  async function onToggleChecklistItem(item: ChecklistItem, isDone: boolean) {
+    if (!planId) return;
+    setChecklistError(null);
+    try {
+      const updated = await toggleChecklistItem(planId, item.id, isDone, accessToken);
+      setChecklistItems((prev) =>
+        prev
+          .map((x) => (x.id === item.id ? updated : x))
+          .sort((a, b) => Number(a.isDone) - Number(b.isDone))
+      );
+    } catch (e) {
+      setChecklistError(e instanceof ApiError ? e.message : 'Promena statusa nije uspela.');
+    }
+  }
+
+  async function onDeleteChecklistItem(itemId: string) {
+    if (!planId) return;
+    setDeletingChecklistId(itemId);
+    setChecklistError(null);
+    try {
+      await deleteChecklistItem(planId, itemId, accessToken);
+      setChecklistItems((prev) => prev.filter((x) => x.id !== itemId));
+    } catch (e) {
+      setChecklistError(e instanceof ApiError ? e.message : 'Brisanje stavke nije uspelo.');
+    } finally {
+      setDeletingChecklistId(null);
     }
   }
 
@@ -351,6 +415,12 @@ export function TravelPlanDetailPage() {
         <article className="plan-overview-card card">
           <p className="muted small">Troškovi (stavke)</p>
           <p className="overview-value">{expenses.length}</p>
+        </article>
+        <article className="plan-overview-card card">
+          <p className="muted small">Checklist</p>
+          <p className="overview-value">
+            {checklistItems.filter((x) => x.isDone).length}/{checklistItems.length}
+          </p>
         </article>
       </section>
 
@@ -640,6 +710,60 @@ export function TravelPlanDetailPage() {
             </section>
           ) : null}
 
+          {activeSection === 'checklista' ? (
+            <section className="card plan-detail-panel wide destination-panel">
+              <div className="destination-panel-head">
+                <h2>Checklist / packing lista</h2>
+              </div>
+              {checklistError ? <p className="error small">{checklistError}</p> : null}
+
+              <div className="checklist-add-row">
+                <input
+                  className="checklist-input"
+                  placeholder="Dodaj stavku (npr. pasoš, karta, punjač...)"
+                  value={newChecklistTitle}
+                  onChange={(e) => setNewChecklistTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void onAddChecklistItem();
+                    }
+                  }}
+                />
+                <button type="button" className="btn primary btn-sm" disabled={addingChecklist} onClick={() => void onAddChecklistItem()}>
+                  {addingChecklist ? 'Dodajem…' : 'Dodaj'}
+                </button>
+              </div>
+
+              {checklistItems.length === 0 ? (
+                <p className="muted">Još nema checklist stavki.</p>
+              ) : (
+                <ul className="checklist-list">
+                  {checklistItems.map((item) => (
+                    <li key={item.id} className={`checklist-item${item.isDone ? ' done' : ''}`}>
+                      <label className="checklist-main">
+                        <input
+                          type="checkbox"
+                          checked={item.isDone}
+                          onChange={(e) => void onToggleChecklistItem(item, e.target.checked)}
+                        />
+                        <span>{item.title}</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="btn danger ghost btn-sm"
+                        disabled={deletingChecklistId === item.id}
+                        onClick={() => void onDeleteChecklistItem(item.id)}
+                      >
+                        {deletingChecklistId === item.id ? 'Brišem…' : 'Obriši'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
           {activeSection === 'napomene' ? (
             <section id="sekcija-napomene" className="card plan-detail-panel wide">
               <h2>Napomene</h2>
@@ -675,6 +799,9 @@ export function TravelPlanDetailPage() {
           </button>
           <button type="button" className={`workspace-menu-item${activeSection === 'kalendar' ? ' active' : ''}`} onClick={() => setActiveSection('kalendar')}>
             Kalendar aktivnosti
+          </button>
+          <button type="button" className={`workspace-menu-item${activeSection === 'checklista' ? ' active' : ''}`} onClick={() => setActiveSection('checklista')}>
+            Checklist / Packing
           </button>
           <button type="button" className={`workspace-menu-item${activeSection === 'napomene' ? ' active' : ''}`} onClick={() => setActiveSection('napomene')}>
             Napomene

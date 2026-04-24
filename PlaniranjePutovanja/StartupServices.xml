@@ -6,6 +6,7 @@
     <Parameter Name="DestinationsApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="ActivitiesApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="ExpensesApi_InstanceCount" DefaultValue="-1" />
+    <Parameter Name="ChecklistApi_InstanceCount" DefaultValue="-1" />
   </Parameters>
   <Services>
     <!-- The section below creates instances of service types, when an instance of this 
@@ -35,6 +36,11 @@
     </Service>
     <Service Name="ExpensesApi" ServicePackageActivationMode="ExclusiveProcess">
       <StatelessService ServiceTypeName="ExpensesApiType" InstanceCount="[ExpensesApi_InstanceCount]">
+        <SingletonPartition />
+      </StatelessService>
+    </Service>
+    <Service Name="ChecklistApi" ServicePackageActivationMode="ExclusiveProcess">
+      <StatelessService ServiceTypeName="ChecklistApiType" InstanceCount="[ChecklistApi_InstanceCount]">
         <SingletonPartition />
       </StatelessService>
     </Service>

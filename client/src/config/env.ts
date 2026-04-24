@@ -32,3 +32,10 @@ export function getExpensesApiBaseUrl(): string {
   const trimmed = (raw ?? '').trim().replace(/\/$/, '');
   return trimmed;
 }
+
+/** Mikroservis checklist / packing liste (ChecklistApi / ServiceManifest — port 8921). */
+export function getChecklistApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_CHECKLIST_API_BASE_URL as string | undefined;
+  const trimmed = (raw ?? '').trim().replace(/\/$/, '');
+  return trimmed;
+}

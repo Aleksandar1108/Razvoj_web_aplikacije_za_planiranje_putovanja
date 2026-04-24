@@ -12,5 +12,7 @@
     <Parameter Name="ActivitiesApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ActivitiesApi-PlaniranjePutovanja" />
     <Parameter Name="ExpensesApi_ASPNETCORE_ENVIRONMENT" Value="Development" />
     <Parameter Name="ExpensesApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ExpensesApi-PlaniranjePutovanja" />
+    <Parameter Name="ChecklistApi_ASPNETCORE_ENVIRONMENT" Value="Development" />
+    <Parameter Name="ChecklistApi_DefaultConnection" Value="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ChecklistApi-PlaniranjePutovanja" />
   </Parameters>
 </Application>
