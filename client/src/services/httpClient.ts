@@ -4,7 +4,8 @@ export async function apiRequestWithBase<T>(
   baseUrl: string,
   path: string,
   init: RequestInit = {},
-  accessToken?: string | null
+  accessToken?: string | null,
+  shareToken?: string | null
 ): Promise<T> {
   const base = baseUrl.trim().replace(/\/$/, '');
   if (!base) {
@@ -17,6 +18,9 @@ export async function apiRequestWithBase<T>(
   }
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`);
+  }
+  if (shareToken) {
+    headers.set('X-Share-Token', shareToken);
   }
 
   const res = await fetch(`${base}${path}`, { ...init, headers });
@@ -68,11 +72,12 @@ function extractMessage(status: number, data: unknown): string {
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
-  accessToken?: string | null
+  accessToken?: string | null,
+  shareToken?: string | null
 ): Promise<T> {
   const base = getApiBaseUrl();
   if (!base) {
     throw new ApiError('Nije podešen VITE_API_BASE_URL u .env fajlu.', 0);
   }
-  return apiRequestWithBase<T>(base, path, init, accessToken);
+  return apiRequestWithBase<T>(base, path, init, accessToken, shareToken);
 }

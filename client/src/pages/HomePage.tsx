@@ -66,6 +66,34 @@ export function HomePage() {
             </div>
           </aside>
         </div>
+
+        <div className="home-grid" style={{ marginTop: 18 }}>
+          <section className="home-card glass-panel" style={{ position: 'relative' }}>
+            <div className="home-card-accent" aria-hidden />
+            <h2 className="home-card-heading">Deljeni planovi</h2>
+            <p className="home-card-lead">
+              Pregled planova koji su <strong>povezani</strong> sa tvojim nalogom nakon učitavanja QR koda.
+            </p>
+            <div className="home-cta-row">
+              <Link to="/shared-plans" className="btn btn-glow primary btn-lg">
+                Otvori deljene planove
+              </Link>
+            </div>
+          </section>
+
+          <section className="home-card glass-panel" style={{ position: 'relative' }}>
+            <div className="home-card-accent" aria-hidden />
+            <h2 className="home-card-heading">Učitaj QR</h2>
+            <p className="home-card-lead">
+              Učitaj PNG/JPG snimak QR koda da <strong>povežeš</strong> plan sa svojim nalogom (claim) i odmah ga otvoriš.
+            </p>
+            <div className="home-cta-row">
+              <Link to="/share/qr" className="btn btn-glow primary btn-lg">
+                Učitaj QR
+              </Link>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

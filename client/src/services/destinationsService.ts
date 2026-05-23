@@ -14,36 +14,44 @@ function requireBase(): string {
   return b;
 }
 
-export async function listDestinations(planId: string, accessToken: string | null): Promise<TravelDestination[]> {
+export async function listDestinations(
+  planId: string,
+  accessToken: string | null,
+  shareToken?: string | null
+): Promise<TravelDestination[]> {
   const base = requireBase();
-  return apiRequestWithBase<TravelDestination[]>(base, basePath(planId), { method: 'GET' }, accessToken);
+  return apiRequestWithBase<TravelDestination[]>(base, basePath(planId), { method: 'GET' }, accessToken, shareToken ?? null);
 }
 
 export async function getDestination(
   planId: string,
   destinationId: string,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<TravelDestination> {
   const base = requireBase();
   return apiRequestWithBase<TravelDestination>(
     base,
     `${basePath(planId)}/${encodeURIComponent(destinationId)}`,
     { method: 'GET' },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
 export async function createDestination(
   planId: string,
   body: TravelDestinationUpsert,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<TravelDestination> {
   const base = requireBase();
   return apiRequestWithBase<TravelDestination>(
     base,
     basePath(planId),
     { method: 'POST', body: JSON.stringify(body) },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
@@ -51,27 +59,31 @@ export async function updateDestination(
   planId: string,
   destinationId: string,
   body: TravelDestinationUpsert,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<TravelDestination> {
   const base = requireBase();
   return apiRequestWithBase<TravelDestination>(
     base,
     `${basePath(planId)}/${encodeURIComponent(destinationId)}`,
     { method: 'PUT', body: JSON.stringify(body) },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
 export async function deleteDestination(
   planId: string,
   destinationId: string,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<void> {
   const base = requireBase();
   await apiRequestWithBase<unknown>(
     base,
     `${basePath(planId)}/${encodeURIComponent(destinationId)}`,
     { method: 'DELETE' },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }

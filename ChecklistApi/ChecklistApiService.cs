@@ -53,6 +53,7 @@ internal sealed class ChecklistApiService : StatelessService
                     if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
                         throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
 
+                    builder.Services.AddScoped<ITravelPlanAccessGuard, TravelPlanAccessGuard>();
                     builder.Services.AddScoped<IChecklistService, ChecklistService>();
 
                     builder.Services.AddCors(options =>

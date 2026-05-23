@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Fabric;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +19,7 @@ using Microsoft.ServiceFabric.Data;
 using Web1.Data;
 using Web1.Infrastructure;
 using Web1.Options;
+using Web1.Services.Admin;
 using Web1.Services.Auth;
 
 namespace Web1
@@ -67,6 +70,7 @@ namespace Web1
                             throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera.");
 
                         builder.Services.AddScoped<IAuthService, AuthService>();
+                        builder.Services.AddScoped<IAdminService, AdminService>();
 
                         builder.Services.AddCors(options =>
                         {
@@ -90,7 +94,9 @@ namespace Web1
                                     ValidIssuer = jwt.Issuer,
                                     ValidAudience = jwt.Audience,
                                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                                    ClockSkew = TimeSpan.FromMinutes(1)
+                                    ClockSkew = TimeSpan.FromMinutes(1),
+                                    NameClaimType = JwtRegisteredClaimNames.Sub,
+                                    RoleClaimType = ClaimTypes.Role
                                 };
                             });
 

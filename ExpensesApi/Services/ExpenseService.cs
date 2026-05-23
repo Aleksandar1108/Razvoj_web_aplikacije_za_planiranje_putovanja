@@ -14,10 +14,10 @@ public sealed class ExpenseService : IExpenseService
         _db = db;
     }
 
-    public async Task<TravelPlanRowEntity?> GetOwnedPlanAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TravelExpenseResponseDto>> ListByTravelPlanIdAsync(
@@ -34,12 +34,11 @@ public sealed class ExpenseService : IExpenseService
     }
 
     public async Task<TravelExpenseResponseDto?> GetAsync(
-        Guid userId,
         Guid travelPlanId,
         Guid expenseId,
         CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return null;
 
         var row = await _db.TravelExpenses.AsNoTracking()
@@ -48,13 +47,12 @@ public sealed class ExpenseService : IExpenseService
     }
 
     public async Task<TravelExpenseResponseDto> CreateAsync(
-        Guid userId,
         Guid travelPlanId,
         CreateTravelExpenseRequestDto request,
         CancellationToken cancellationToken)
     {
         var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
         if (plan is null)
             throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
@@ -81,13 +79,12 @@ public sealed class ExpenseService : IExpenseService
     }
 
     public async Task<TravelExpenseResponseDto?> UpdateAsync(
-        Guid userId,
         Guid travelPlanId,
         Guid expenseId,
         UpdateTravelExpenseRequestDto request,
         CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return null;
 
         var entity = await _db.TravelExpenses
@@ -110,12 +107,11 @@ public sealed class ExpenseService : IExpenseService
     }
 
     public async Task<bool> DeleteAsync(
-        Guid userId,
         Guid travelPlanId,
         Guid expenseId,
         CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return false;
 
         var entity = await _db.TravelExpenses
@@ -128,10 +124,10 @@ public sealed class ExpenseService : IExpenseService
         return true;
     }
 
-    public async Task<ExpenseSummaryDto?> GetSummaryAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    public async Task<ExpenseSummaryDto?> GetSummaryAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
         if (plan is null)
             return null;
 
@@ -153,10 +149,10 @@ public sealed class ExpenseService : IExpenseService
         };
     }
 
-    private async Task<bool> PlanOwnedAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
     }
 
     private static void ValidateAmount(decimal amount)

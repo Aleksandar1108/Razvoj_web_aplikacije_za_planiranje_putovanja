@@ -12,6 +12,8 @@ public sealed class ChecklistDbContext : DbContext
 
     public DbSet<ChecklistItemEntity> ChecklistItems => Set<ChecklistItemEntity>();
     public DbSet<TravelPlanRowEntity> TravelPlans => Set<TravelPlanRowEntity>();
+    public DbSet<TravelPlanShareLinkEntity> TravelPlanShareLinks => Set<TravelPlanShareLinkEntity>();
+    public DbSet<TravelPlanShareRecipientEntity> TravelPlanShareRecipients => Set<TravelPlanShareRecipientEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,6 +34,33 @@ public sealed class ChecklistDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.TravelPlanId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TravelPlanShareLinkEntity>(e =>
+        {
+            e.ToTable("TravelPlanShareLinks");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.TokenHash).HasColumnType("varbinary(32)").IsRequired();
+            e.Property(x => x.Permission).HasMaxLength(10).IsRequired();
+            e.HasIndex(x => x.TokenHash).IsUnique();
+
+            e.HasOne<TravelPlanRowEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.TravelPlanId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<TravelPlanShareRecipientEntity>(e =>
+        {
+            e.ToTable("TravelPlanShareRecipients");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Permission).HasMaxLength(10).IsRequired();
+            e.HasIndex(x => new { x.TravelPlanId, x.RecipientUserId }).IsUnique();
+
+            e.HasOne<TravelPlanRowEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.TravelPlanId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

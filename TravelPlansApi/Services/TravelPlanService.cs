@@ -32,6 +32,13 @@ public sealed class TravelPlanService : ITravelPlanService
         return row is null ? null : Map(row);
     }
 
+    public async Task<TravelPlanResponseDto?> GetByIdAsync(Guid planId, CancellationToken cancellationToken)
+    {
+        var row = await _db.TravelPlans.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
+        return row is null ? null : Map(row);
+    }
+
     public async Task<TravelPlanResponseDto> CreateAsync(Guid userId, CreateTravelPlanRequestDto request, CancellationToken cancellationToken)
     {
         var start = request.StartDate!.Value;

@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { useAuth } from '../context/AuthContext';
 import { deleteTravelPlan, getTravelPlan } from '../services/travelPlansService';
 import { deleteDestination, listDestinations } from '../services/destinationsService';
 import { deleteActivity, listActivities } from '../services/activitiesService';
 import { deleteExpense, getExpenseSummary, listExpenses } from '../services/expensesService';
 import { createChecklistItem, deleteChecklistItem, listChecklistItems, toggleChecklistItem } from '../services/checklistService';
+import { createShareLink } from '../services/sharingService';
 import type { TravelPlan } from '../models/travelPlan';
 import type { TravelDestination } from '../models/travelDestination';
 import type { TravelActivity } from '../models/travelActivity';
 import type { ExpenseSummary, TravelExpense } from '../models/travelExpense';
 import type { ChecklistItem } from '../models/checklistItem';
+import type { SharePermission } from '../models/share';
 import { ApiError } from '../services/httpClient';
 
 type PlanSection = 'osnovno' | 'destinacije' | 'troskovi' | 'aktivnosti' | 'kalendar' | 'checklista' | 'napomene';
@@ -108,6 +111,19 @@ export function TravelPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   const { accessToken } = useAuth();
+  const [searchParams] = useSearchParams();
+  const shareHeaderToken = useMemo(() => {
+    const raw = searchParams.get('t');
+    const trimmed = (raw ?? '').trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }, [searchParams]);
+
+  const sharePermQuery = useMemo(() => {
+    const raw = (searchParams.get('p') ?? '').trim().toLowerCase();
+    if (raw === 'view' || raw === 'edit') return raw as SharePermission;
+    return null;
+  }, [searchParams]);
+
   const [plan, setPlan] = useState<TravelPlan | null>(null);
   const [destinations, setDestinations] = useState<TravelDestination[]>([]);
   const [activities, setActivities] = useState<TravelActivity[]>([]);
@@ -131,6 +147,11 @@ export function TravelPlanDetailPage() {
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [addingChecklist, setAddingChecklist] = useState(false);
 
+  const [sharePermissionPick, setSharePermissionPick] = useState<SharePermission>('view');
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareQrPngDataUrl, setShareQrPngDataUrl] = useState<string | null>(null);
+
   useEffect(() => {
     if (!planId) return;
     let cancelled = false;
@@ -142,11 +163,11 @@ export function TravelPlanDetailPage() {
       setExpError(null);
       setChecklistError(null);
       try {
-        const p = await getTravelPlan(planId, accessToken);
+        const p = await getTravelPlan(planId, accessToken, shareHeaderToken);
         if (cancelled) return;
         setPlan(p);
         try {
-          const d = await listDestinations(planId, accessToken);
+          const d = await listDestinations(planId, accessToken, shareHeaderToken);
           if (!cancelled) setDestinations(d);
         } catch (de) {
           if (!cancelled) {
@@ -155,7 +176,7 @@ export function TravelPlanDetailPage() {
           }
         }
         try {
-          const a = await listActivities(planId, accessToken);
+          const a = await listActivities(planId, accessToken, shareHeaderToken);
           if (!cancelled) setActivities(a);
         } catch (ae) {
           if (!cancelled) {
@@ -164,9 +185,9 @@ export function TravelPlanDetailPage() {
           }
         }
         try {
-          const e = await listExpenses(planId, accessToken);
+          const e = await listExpenses(planId, accessToken, shareHeaderToken);
           if (!cancelled) setExpenses(e);
-          const s = await getExpenseSummary(planId, accessToken);
+          const s = await getExpenseSummary(planId, accessToken, shareHeaderToken);
           if (!cancelled) setExpenseSummary(s);
         } catch (ee) {
           if (!cancelled) {
@@ -176,7 +197,7 @@ export function TravelPlanDetailPage() {
           }
         }
         try {
-          const items = await listChecklistItems(planId, accessToken);
+          const items = await listChecklistItems(planId, accessToken, shareHeaderToken);
           if (!cancelled) setChecklistItems(items);
         } catch (ce) {
           if (!cancelled) {
@@ -201,14 +222,14 @@ export function TravelPlanDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [planId, accessToken]);
+  }, [planId, accessToken, shareHeaderToken]);
 
   async function onDelete() {
     if (!planId) return;
     setDeleting(true);
     setError(null);
     try {
-      await deleteTravelPlan(planId, accessToken);
+      await deleteTravelPlan(planId, accessToken, shareHeaderToken);
       navigate('/plans', { replace: true });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Brisanje nije uspjelo.');
@@ -224,7 +245,7 @@ export function TravelPlanDetailPage() {
     setDeletingDestId(destinationId);
     setDestError(null);
     try {
-      await deleteDestination(planId, destinationId, accessToken);
+      await deleteDestination(planId, destinationId, accessToken, shareHeaderToken);
       setDestinations((prev) => prev.filter((x) => x.id !== destinationId));
     } catch (e) {
       setDestError(e instanceof ApiError ? e.message : 'Brisanje destinacije nije uspjelo.');
@@ -239,7 +260,7 @@ export function TravelPlanDetailPage() {
     setDeletingActId(activityId);
     setActError(null);
     try {
-      await deleteActivity(planId, activityId, accessToken);
+      await deleteActivity(planId, activityId, accessToken, shareHeaderToken);
       const nextActivities = activities.filter((x) => x.id !== activityId);
       setActivities(nextActivities);
       const plannedBudget = plan?.plannedBudget ?? 0;
@@ -257,7 +278,7 @@ export function TravelPlanDetailPage() {
     setDeletingExpId(expenseId);
     setExpError(null);
     try {
-      await deleteExpense(planId, expenseId, accessToken);
+      await deleteExpense(planId, expenseId, accessToken, shareHeaderToken);
       const next = expenses.filter((x) => x.id !== expenseId);
       setExpenses(next);
       const plannedBudget = plan?.plannedBudget ?? 0;
@@ -276,7 +297,7 @@ export function TravelPlanDetailPage() {
     setAddingChecklist(true);
     setChecklistError(null);
     try {
-      const created = await createChecklistItem(planId, { title }, accessToken);
+      const created = await createChecklistItem(planId, { title }, accessToken, shareHeaderToken);
       setChecklistItems((prev) => [...prev, created].sort((a, b) => Number(a.isDone) - Number(b.isDone)));
       setNewChecklistTitle('');
     } catch (e) {
@@ -290,7 +311,7 @@ export function TravelPlanDetailPage() {
     if (!planId) return;
     setChecklistError(null);
     try {
-      const updated = await toggleChecklistItem(planId, item.id, isDone, accessToken);
+      const updated = await toggleChecklistItem(planId, item.id, isDone, accessToken, shareHeaderToken);
       setChecklistItems((prev) =>
         prev
           .map((x) => (x.id === item.id ? updated : x))
@@ -306,7 +327,7 @@ export function TravelPlanDetailPage() {
     setDeletingChecklistId(itemId);
     setChecklistError(null);
     try {
-      await deleteChecklistItem(planId, itemId, accessToken);
+      await deleteChecklistItem(planId, itemId, accessToken, shareHeaderToken);
       setChecklistItems((prev) => prev.filter((x) => x.id !== itemId));
     } catch (e) {
       setChecklistError(e instanceof ApiError ? e.message : 'Brisanje stavke nije uspelo.');
@@ -358,6 +379,37 @@ export function TravelPlanDetailPage() {
     }
   }
 
+  const canMutateUi = sharePermQuery === null || sharePermQuery === 'edit';
+  const showOwnerToolbar = sharePermQuery === null;
+
+  async function onGenerateShareQr() {
+    if (!planId) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareQrPngDataUrl(null);
+    try {
+      const created = await createShareLink(planId, sharePermissionPick, accessToken);
+      const dataUrl = await QRCode.toDataURL(created.qrPayloadJson, {
+        errorCorrectionLevel: 'M',
+        margin: 2,
+        width: 512,
+      });
+      setShareQrPngDataUrl(dataUrl);
+    } catch (e) {
+      setShareError(e instanceof ApiError ? e.message : 'Generisanje QR koda nije uspjelo.');
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  function onDownloadShareQrPng() {
+    if (!shareQrPngDataUrl || !planId) return;
+    const a = document.createElement('a');
+    a.href = shareQrPngDataUrl;
+    a.download = `plan-${planId}-share-qr.png`;
+    a.click();
+  }
+
   return (
     <div className="page plan-detail-page">
       <Link to="/plans" className="back-link">
@@ -371,12 +423,18 @@ export function TravelPlanDetailPage() {
           <p className="plan-detail-sub">{plan.shortDescription}</p>
         </div>
         <div className="plan-detail-toolbar">
-          <Link to={`/plans/${plan.id}/edit`} className="btn primary">
-            Izmeni
-          </Link>
-          <button type="button" className="btn danger ghost" onClick={() => setConfirmDelete(true)}>
-            Obriši
-          </button>
+          {showOwnerToolbar ? (
+            <Link to={`/plans/${plan.id}/edit`} className="btn primary">
+              Izmeni
+            </Link>
+          ) : (
+            <span className="pill">Deljen plan · {sharePermQuery === 'edit' ? 'uređivanje' : 'pregled'}</span>
+          )}
+          {showOwnerToolbar ? (
+            <button type="button" className="btn danger ghost" onClick={() => setConfirmDelete(true)}>
+              Obriši
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -446,6 +504,53 @@ export function TravelPlanDetailPage() {
                 <p className="plan-detail-budget">{formatBudget(plan.plannedBudget)} EUR</p>
                 <p className="muted small">Planirani budžet putovanja.</p>
               </section>
+
+              {showOwnerToolbar ? (
+                <section className="card plan-detail-panel wide destination-panel">
+                  <div className="destination-panel-head">
+                    <h2>Deljenje (QR)</h2>
+                  </div>
+                  <p className="muted small">
+                    Izaberi nivo pristupa, generiši QR i preuzmi PNG. Drugi korisnik učitava QR u sekciji „Učitaj QR“.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+                    <label className="muted small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span>Pristup</span>
+                      <select
+                        className="input"
+                        value={sharePermissionPick}
+                        onChange={(e) => setSharePermissionPick(e.target.value as SharePermission)}
+                      >
+                        <option value="view">Pregled (VIEW)</option>
+                        <option value="edit">Uređivanje (EDIT)</option>
+                      </select>
+                    </label>
+                    <button type="button" className="btn btn-glow primary btn-sm" disabled={shareBusy} onClick={onGenerateShareQr}>
+                      {shareBusy ? 'Generišem…' : 'Generiši QR'}
+                    </button>
+                    <button type="button" className="btn ghost btn-sm" disabled={!shareQrPngDataUrl} onClick={onDownloadShareQrPng}>
+                      Preuzmi PNG
+                    </button>
+                  </div>
+
+                  {shareError ? (
+                    <p className="error small" style={{ marginTop: 10 }}>
+                      {shareError}
+                    </p>
+                  ) : null}
+
+                  {shareQrPngDataUrl ? (
+                    <div style={{ marginTop: 12 }}>
+                      <img
+                        alt="QR kod za deljenje plana"
+                        src={shareQrPngDataUrl}
+                        style={{ width: 240, height: 240, borderRadius: 16, border: '1px solid rgba(15, 23, 42, 0.12)' }}
+                      />
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
             </>
           ) : null}
 
@@ -453,9 +558,11 @@ export function TravelPlanDetailPage() {
             <section id="sekcija-destinacije" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Destinacije</h2>
-            <Link to={`/plans/${plan.id}/destinations/new`} className="btn btn-glow primary btn-sm">
-              Nova destinacija
-            </Link>
+            {canMutateUi ? (
+              <Link to={`/plans/${plan.id}/destinations/new`} className="btn btn-glow primary btn-sm">
+                Nova destinacija
+              </Link>
+            ) : null}
           </div>
           {destError ? <p className="error small">{destError}</p> : null}
           {destinations.length === 0 ? (
@@ -472,19 +579,21 @@ export function TravelPlanDetailPage() {
                     </p>
                     {d.notes?.trim() ? <p className="destination-notes small">{d.notes}</p> : null}
                   </div>
-                  <div className="destination-item-actions">
-                    <Link to={`/plans/${plan.id}/destinations/${d.id}/edit`} className="btn ghost btn-sm">
-                      Izmeni
-                    </Link>
-                    <button
-                      type="button"
-                      className="btn danger ghost btn-sm"
-                      disabled={deletingDestId === d.id}
-                      onClick={() => onDeleteDestination(d.id)}
-                    >
-                      {deletingDestId === d.id ? 'Brišem…' : 'Obriši'}
-                    </button>
-                  </div>
+                  {canMutateUi ? (
+                    <div className="destination-item-actions">
+                      <Link to={`/plans/${plan.id}/destinations/${d.id}/edit`} className="btn ghost btn-sm">
+                        Izmeni
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn danger ghost btn-sm"
+                        disabled={deletingDestId === d.id}
+                        onClick={() => onDeleteDestination(d.id)}
+                      >
+                        {deletingDestId === d.id ? 'Brišem…' : 'Obriši'}
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -496,9 +605,11 @@ export function TravelPlanDetailPage() {
             <section id="sekcija-troskovi" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Troškovi i budžet</h2>
-            <Link to={`/plans/${plan.id}/expenses/new`} className="btn btn-glow primary btn-sm">
-              Novi trošak
-            </Link>
+            {canMutateUi ? (
+              <Link to={`/plans/${plan.id}/expenses/new`} className="btn btn-glow primary btn-sm">
+                Novi trošak
+              </Link>
+            ) : null}
           </div>
           {expError ? <p className="error small">{expError}</p> : null}
           <div className="expense-summary-grid">
@@ -539,19 +650,21 @@ export function TravelPlanDetailPage() {
                     </p>
                     <p className="destination-notes small">{e.description ?? 'Bez opisa'}</p>
                   </div>
-                  <div className="destination-item-actions">
-                    <Link to={`/plans/${plan.id}/expenses/${e.id}/edit`} className="btn ghost btn-sm">
-                      Izmeni
-                    </Link>
-                    <button
-                      type="button"
-                      className="btn danger ghost btn-sm"
-                      disabled={deletingExpId === e.id}
-                      onClick={() => onDeleteExpense(e.id)}
-                    >
-                      {deletingExpId === e.id ? 'Brišem…' : 'Obriši'}
-                    </button>
-                  </div>
+                  {canMutateUi ? (
+                    <div className="destination-item-actions">
+                      <Link to={`/plans/${plan.id}/expenses/${e.id}/edit`} className="btn ghost btn-sm">
+                        Izmeni
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn danger ghost btn-sm"
+                        disabled={deletingExpId === e.id}
+                        onClick={() => onDeleteExpense(e.id)}
+                      >
+                        {deletingExpId === e.id ? 'Brišem…' : 'Obriši'}
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -563,9 +676,11 @@ export function TravelPlanDetailPage() {
             <section id="sekcija-aktivnosti" className="card plan-detail-panel wide destination-panel">
           <div className="destination-panel-head">
             <h2>Aktivnosti po danima</h2>
-            <Link to={`/plans/${plan.id}/activities/new`} className="btn btn-glow primary btn-sm">
-              Nova aktivnost
-            </Link>
+            {canMutateUi ? (
+              <Link to={`/plans/${plan.id}/activities/new`} className="btn btn-glow primary btn-sm">
+                Nova aktivnost
+              </Link>
+            ) : null}
           </div>
           {actError ? <p className="error small">{actError}</p> : null}
           {groupedDates.length === 0 ? (
@@ -590,19 +705,21 @@ export function TravelPlanDetailPage() {
                             <span className={statusClass(a.status)}>{formatStatus(a.status)}</span>
                           </p>
                         </div>
-                        <div className="destination-item-actions">
-                          <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
-                            Izmeni
-                          </Link>
-                          <button
-                            type="button"
-                            className="btn danger ghost btn-sm"
-                            disabled={deletingActId === a.id}
-                            onClick={() => onDeleteActivity(a.id)}
-                          >
-                            {deletingActId === a.id ? 'Brišem…' : 'Obriši'}
-                          </button>
-                        </div>
+                        {canMutateUi ? (
+                          <div className="destination-item-actions">
+                            <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
+                              Izmeni
+                            </Link>
+                            <button
+                              type="button"
+                              className="btn danger ghost btn-sm"
+                              disabled={deletingActId === a.id}
+                              onClick={() => onDeleteActivity(a.id)}
+                            >
+                              {deletingActId === a.id ? 'Brišem…' : 'Obriši'}
+                            </button>
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -696,9 +813,11 @@ export function TravelPlanDetailPage() {
                           {' · '}
                           <span className={statusClass(a.status)}>{formatStatus(a.status)}</span>
                         </p>
-                        <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
-                          Izmeni
-                        </Link>
+                        {canMutateUi ? (
+                          <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
+                            Izmeni
+                          </Link>
+                        ) : null}
                       </li>
                     ))}
                 </ul>
@@ -722,6 +841,7 @@ export function TravelPlanDetailPage() {
                   className="checklist-input"
                   placeholder="Dodaj stavku (npr. pasoš, karta, punjač...)"
                   value={newChecklistTitle}
+                  disabled={!canMutateUi}
                   onChange={(e) => setNewChecklistTitle(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -730,7 +850,12 @@ export function TravelPlanDetailPage() {
                     }
                   }}
                 />
-                <button type="button" className="btn primary btn-sm" disabled={addingChecklist} onClick={() => void onAddChecklistItem()}>
+                <button
+                  type="button"
+                  className="btn primary btn-sm"
+                  disabled={!canMutateUi || addingChecklist}
+                  onClick={() => void onAddChecklistItem()}
+                >
                   {addingChecklist ? 'Dodajem…' : 'Dodaj'}
                 </button>
               </div>
@@ -745,18 +870,21 @@ export function TravelPlanDetailPage() {
                         <input
                           type="checkbox"
                           checked={item.isDone}
+                          disabled={!canMutateUi}
                           onChange={(e) => void onToggleChecklistItem(item, e.target.checked)}
                         />
                         <span>{item.title}</span>
                       </label>
-                      <button
-                        type="button"
-                        className="btn danger ghost btn-sm"
-                        disabled={deletingChecklistId === item.id}
-                        onClick={() => void onDeleteChecklistItem(item.id)}
-                      >
-                        {deletingChecklistId === item.id ? 'Brišem…' : 'Obriši'}
-                      </button>
+                      {canMutateUi ? (
+                        <button
+                          type="button"
+                          className="btn danger ghost btn-sm"
+                          disabled={deletingChecklistId === item.id}
+                          onClick={() => void onDeleteChecklistItem(item.id)}
+                        >
+                          {deletingChecklistId === item.id ? 'Brišem…' : 'Obriši'}
+                        </button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

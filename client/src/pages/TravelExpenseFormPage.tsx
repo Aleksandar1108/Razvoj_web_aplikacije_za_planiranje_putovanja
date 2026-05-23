@@ -72,9 +72,15 @@ export function TravelExpenseFormPage() {
     if (!planId) return;
     setSaving(true);
     setError(null);
+    const amount = Number.isFinite(form.amount) ? form.amount : 0;
+    if (amount < 0) {
+      setError('Iznos troška ne može biti negativan.');
+      setSaving(false);
+      return;
+    }
     const payload: TravelExpenseUpsert = {
       ...form,
-      amount: Number.isFinite(form.amount) ? form.amount : 0,
+      amount,
       description: form.description?.trim() ? form.description.trim() : null,
     };
     try {

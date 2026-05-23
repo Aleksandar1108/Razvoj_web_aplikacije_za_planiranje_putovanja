@@ -73,6 +73,23 @@ export function TravelDestinationFormPage() {
     if (!planId) return;
     setSaving(true);
     setError(null);
+
+    if (!form.arrivalDate || !form.departureDate) {
+      setError('Izaberi datume dolaska i odlaska.');
+      setSaving(false);
+      return;
+    }
+    if (form.departureDate < form.arrivalDate) {
+      setError('Datum odlaska ne može biti pre datuma dolaska.');
+      setSaving(false);
+      return;
+    }
+    if (plan && (form.arrivalDate < plan.startDate || form.departureDate > plan.endDate)) {
+      setError('Datumi destinacije moraju biti u okviru datuma plana putovanja.');
+      setSaving(false);
+      return;
+    }
+
     const payload: TravelDestinationUpsert = {
       ...form,
       notes: form.notes?.trim() ? form.notes.trim() : null,

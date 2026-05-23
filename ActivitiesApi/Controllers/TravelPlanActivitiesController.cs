@@ -1,6 +1,5 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using ActivitiesApi.Dtos;
+using ActivitiesApi.Infrastructure;
 using ActivitiesApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,15 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace ActivitiesApi.Controllers;
 
 [ApiController]
-[Authorize]
+[AllowAnonymous]
 [Route("api/v1/travel-plans/{travelPlanId:guid}/activities")]
 public sealed class TravelPlanActivitiesController : ControllerBase
 {
     private readonly IActivityService _activities;
+    private readonly ITravelPlanAccessGuard _access;
 
-    public TravelPlanActivitiesController(IActivityService activities)
+    public TravelPlanActivitiesController(IActivityService activities, ITravelPlanAccessGuard access)
     {
         _activities = activities;
+        _access = access;
     }
 
     [HttpGet]
@@ -26,10 +27,9 @@ public sealed class TravelPlanActivitiesController : ControllerBase
         Guid travelPlanId,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        if (await _activities.GetOwnedPlanAsync(userId, travelPlanId, cancellationToken) is null)
-            return NotFound();
         var list = await _activities.ListByTravelPlanIdAsync(travelPlanId, cancellationToken);
         return Ok(list);
     }
@@ -42,9 +42,10 @@ public sealed class TravelPlanActivitiesController : ControllerBase
         Guid activityId,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var dto = await _activities.GetAsync(userId, travelPlanId, activityId, cancellationToken);
+        var dto = await _activities.GetAsync(travelPlanId, activityId, cancellationToken);
         return dto is null ? NotFound() : Ok(dto);
     }
 
@@ -59,12 +60,15 @@ public sealed class TravelPlanActivitiesController : ControllerBase
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
 
         try
         {
-            var created = await _activities.CreateAsync(userId, travelPlanId, request, cancellationToken);
+            var created = await _activities.CreateAsync(travelPlanId, request, cancellationToken);
             return CreatedAtAction(
                 nameof(Get),
                 new { travelPlanId, activityId = created.Id },
@@ -92,12 +96,15 @@ public sealed class TravelPlanActivitiesController : ControllerBase
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
 
         try
         {
-            var updated = await _activities.UpdateAsync(userId, travelPlanId, activityId, request, cancellationToken);
+            var updated = await _activities.UpdateAsync(travelPlanId, activityId, request, cancellationToken);
             return updated is null ? NotFound() : Ok(updated);
         }
         catch (ArgumentException ex)
@@ -114,16 +121,12 @@ public sealed class TravelPlanActivitiesController : ControllerBase
         Guid activityId,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var ok = await _activities.DeleteAsync(userId, travelPlanId, activityId, cancellationToken);
+        if (!access.CanMutate)
+            return Forbid();
+        var ok = await _activities.DeleteAsync(travelPlanId, activityId, cancellationToken);
         return ok ? NoContent() : NotFound();
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return Guid.TryParse(raw, out userId);
     }
 }

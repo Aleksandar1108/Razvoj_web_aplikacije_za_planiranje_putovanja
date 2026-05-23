@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppHeader } from './components/AppHeader';
+import { AdminRoute } from './components/AdminRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -10,6 +11,9 @@ import { TravelPlanDetailPage } from './pages/TravelPlanDetailPage';
 import { TravelDestinationFormPage } from './pages/TravelDestinationFormPage';
 import { TravelPlanFormPage } from './pages/TravelPlanFormPage';
 import { TravelPlansListPage } from './pages/TravelPlansListPage';
+import { SharedPlansPage } from './pages/SharedPlansPage';
+import { ImportShareQrPage } from './pages/ImportShareQrPage';
+import { AdminUsersPage } from './pages/AdminUsersPage';
 
 export default function App() {
   return (
@@ -22,6 +26,8 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/plans" element={<TravelPlansListPage />} />
+            <Route path="/shared-plans" element={<SharedPlansPage />} />
+            <Route path="/share/qr" element={<ImportShareQrPage />} />
             <Route path="/plans/new" element={<TravelPlanFormPage />} />
             <Route path="/plans/:planId/edit" element={<TravelPlanFormPage />} />
             <Route path="/plans/:planId/destinations/new" element={<TravelDestinationFormPage />} />
@@ -31,6 +37,9 @@ export default function App() {
             <Route path="/plans/:planId/expenses/new" element={<TravelExpenseFormPage />} />
             <Route path="/plans/:planId/expenses/:expenseId/edit" element={<TravelExpenseFormPage />} />
             <Route path="/plans/:planId" element={<TravelPlanDetailPage />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/admin/korisnici" element={<AdminUsersPage />} />
+            </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

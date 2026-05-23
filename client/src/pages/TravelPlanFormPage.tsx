@@ -64,8 +64,18 @@ export function TravelPlanFormPage() {
     setSaving(true);
     setError(null);
 
-    if (!isEdit && form.plannedBudget <= 0) {
-      setError('Unesi planirani budžet u EUR (broj veći od nule).');
+    if (!form.startDate || !form.endDate) {
+      setError('Izaberi početni i krajnji datum.');
+      setSaving(false);
+      return;
+    }
+    if (form.endDate < form.startDate) {
+      setError('Krajnji datum ne može biti prije početnog.');
+      setSaving(false);
+      return;
+    }
+    if (form.plannedBudget < 0) {
+      setError('Planirani budžet ne može biti negativan.');
       setSaving(false);
       return;
     }

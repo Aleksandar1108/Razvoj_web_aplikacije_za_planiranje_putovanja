@@ -14,39 +14,56 @@ function requireBase(): string {
 
 export async function listTravelPlans(accessToken: string | null): Promise<TravelPlan[]> {
   const base = requireBase();
-  return apiRequestWithBase<TravelPlan[]>(base, basePath, { method: 'GET' }, accessToken);
+  return apiRequestWithBase<TravelPlan[]>(base, basePath, { method: 'GET' }, accessToken, null);
 }
 
-export async function getTravelPlan(id: string, accessToken: string | null): Promise<TravelPlan> {
+export async function getTravelPlan(
+  id: string,
+  accessToken: string | null,
+  shareToken?: string | null
+): Promise<TravelPlan> {
   const base = requireBase();
-  return apiRequestWithBase<TravelPlan>(base, `${basePath}/${encodeURIComponent(id)}`, { method: 'GET' }, accessToken);
+  return apiRequestWithBase<TravelPlan>(
+    base,
+    `${basePath}/${encodeURIComponent(id)}`,
+    { method: 'GET' },
+    accessToken,
+    shareToken ?? null
+  );
 }
 
 export async function createTravelPlan(body: TravelPlanUpsert, accessToken: string | null): Promise<TravelPlan> {
   const base = requireBase();
-  return apiRequestWithBase<TravelPlan>(base, basePath, { method: 'POST', body: JSON.stringify(body) }, accessToken);
+  return apiRequestWithBase<TravelPlan>(base, basePath, { method: 'POST', body: JSON.stringify(body) }, accessToken, null);
 }
 
 export async function updateTravelPlan(
   id: string,
   body: TravelPlanUpsert,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<TravelPlan> {
   const base = requireBase();
   return apiRequestWithBase<TravelPlan>(
     base,
     `${basePath}/${encodeURIComponent(id)}`,
     { method: 'PUT', body: JSON.stringify(body) },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
-export async function deleteTravelPlan(id: string, accessToken: string | null): Promise<void> {
+export async function deleteTravelPlan(
+  id: string,
+  accessToken: string | null,
+  shareToken?: string | null
+): Promise<void> {
   const base = requireBase();
   await apiRequestWithBase<unknown>(
     base,
     `${basePath}/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }

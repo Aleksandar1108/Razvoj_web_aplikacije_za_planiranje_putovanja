@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExpensesApi", "ExpensesApi\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChecklistApi", "ChecklistApi\ChecklistApi.csproj", "{C4DDF910-3E3E-4F52-B6D8-9D8F6A237AB2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharingApi", "SharingApi\SharingApi.csproj", "{AABBCCDD-1122-3344-5566-77889900AABB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +87,14 @@ Global
 		{C4DDF910-3E3E-4F52-B6D8-9D8F6A237AB2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C4DDF910-3E3E-4F52-B6D8-9D8F6A237AB2}.Release|x64.ActiveCfg = Release|Any CPU
 		{C4DDF910-3E3E-4F52-B6D8-9D8F6A237AB2}.Release|x64.Build.0 = Release|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Debug|x64.Build.0 = Debug|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Release|x64.ActiveCfg = Release|Any CPU
+		{AABBCCDD-1122-3344-5566-77889900AABB}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

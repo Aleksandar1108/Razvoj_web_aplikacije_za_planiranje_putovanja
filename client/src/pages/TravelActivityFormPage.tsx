@@ -76,11 +76,29 @@ export function TravelActivityFormPage() {
     if (!planId) return;
     setSaving(true);
     setError(null);
+
+    const estimatedCost = Number.isFinite(form.estimatedCost) ? form.estimatedCost : 0;
+    if (estimatedCost < 0) {
+      setError('Procijenjeni trošak ne može biti negativan.');
+      setSaving(false);
+      return;
+    }
+    if (!form.activityDate) {
+      setError('Izaberi datum aktivnosti.');
+      setSaving(false);
+      return;
+    }
+    if (plan && (form.activityDate < plan.startDate || form.activityDate > plan.endDate)) {
+      setError('Datum aktivnosti mora biti u okviru datuma plana putovanja.');
+      setSaving(false);
+      return;
+    }
+
     const payload: TravelActivityUpsert = {
       ...form,
       description: form.description?.trim() ? form.description.trim() : null,
       status: form.status,
-      estimatedCost: Number.isFinite(form.estimatedCost) ? form.estimatedCost : 0,
+      estimatedCost,
     };
     try {
       if (isEdit && activityId) {

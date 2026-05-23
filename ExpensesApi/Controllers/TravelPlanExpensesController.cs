@@ -1,6 +1,5 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using ExpensesApi.Dtos;
+using ExpensesApi.Infrastructure;
 using ExpensesApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,15 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace ExpensesApi.Controllers;
 
 [ApiController]
-[Authorize]
+[AllowAnonymous]
 [Route("api/v1/travel-plans/{travelPlanId:guid}/expenses")]
 public sealed class TravelPlanExpensesController : ControllerBase
 {
     private readonly IExpenseService _expenses;
+    private readonly ITravelPlanAccessGuard _access;
 
-    public TravelPlanExpensesController(IExpenseService expenses)
+    public TravelPlanExpensesController(IExpenseService expenses, ITravelPlanAccessGuard access)
     {
         _expenses = expenses;
+        _access = access;
     }
 
     [HttpGet]
@@ -26,10 +27,9 @@ public sealed class TravelPlanExpensesController : ControllerBase
         Guid travelPlanId,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        if (await _expenses.GetOwnedPlanAsync(userId, travelPlanId, cancellationToken) is null)
-            return NotFound();
         var list = await _expenses.ListByTravelPlanIdAsync(travelPlanId, cancellationToken);
         return Ok(list);
     }
@@ -39,9 +39,10 @@ public sealed class TravelPlanExpensesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ExpenseSummaryDto>> Summary(Guid travelPlanId, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var dto = await _expenses.GetSummaryAsync(userId, travelPlanId, cancellationToken);
+        var dto = await _expenses.GetSummaryAsync(travelPlanId, cancellationToken);
         return dto is null ? NotFound() : Ok(dto);
     }
 
@@ -53,9 +54,10 @@ public sealed class TravelPlanExpensesController : ControllerBase
         Guid expenseId,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var dto = await _expenses.GetAsync(userId, travelPlanId, expenseId, cancellationToken);
+        var dto = await _expenses.GetAsync(travelPlanId, expenseId, cancellationToken);
         return dto is null ? NotFound() : Ok(dto);
     }
 
@@ -70,12 +72,15 @@ public sealed class TravelPlanExpensesController : ControllerBase
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
 
         try
         {
-            var created = await _expenses.CreateAsync(userId, travelPlanId, request, cancellationToken);
+            var created = await _expenses.CreateAsync(travelPlanId, request, cancellationToken);
             return CreatedAtAction(nameof(Get), new { travelPlanId, expenseId = created.Id }, created);
         }
         catch (InvalidOperationException)
@@ -100,12 +105,15 @@ public sealed class TravelPlanExpensesController : ControllerBase
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
 
         try
         {
-            var updated = await _expenses.UpdateAsync(userId, travelPlanId, expenseId, request, cancellationToken);
+            var updated = await _expenses.UpdateAsync(travelPlanId, expenseId, request, cancellationToken);
             return updated is null ? NotFound() : Ok(updated);
         }
         catch (ArgumentException ex)
@@ -122,16 +130,12 @@ public sealed class TravelPlanExpensesController : ControllerBase
         Guid expenseId,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var ok = await _expenses.DeleteAsync(userId, travelPlanId, expenseId, cancellationToken);
+        if (!access.CanMutate)
+            return Forbid();
+        var ok = await _expenses.DeleteAsync(travelPlanId, expenseId, cancellationToken);
         return ok ? NoContent() : NotFound();
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return Guid.TryParse(raw, out userId);
     }
 }

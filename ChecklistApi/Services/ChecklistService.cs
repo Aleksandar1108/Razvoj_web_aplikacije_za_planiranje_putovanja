@@ -14,10 +14,10 @@ public sealed class ChecklistService : IChecklistService
         _db = db;
     }
 
-    public async Task<TravelPlanRowEntity?> GetOwnedPlanAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ChecklistItemResponseDto>> ListByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken)
@@ -30,9 +30,9 @@ public sealed class ChecklistService : IChecklistService
         return rows.Select(Map).ToList();
     }
 
-    public async Task<ChecklistItemResponseDto?> GetAsync(Guid userId, Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
+    public async Task<ChecklistItemResponseDto?> GetAsync(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return null;
 
         var row = await _db.ChecklistItems.AsNoTracking()
@@ -40,9 +40,9 @@ public sealed class ChecklistService : IChecklistService
         return row is null ? null : Map(row);
     }
 
-    public async Task<ChecklistItemResponseDto> CreateAsync(Guid userId, Guid travelPlanId, CreateChecklistItemRequestDto request, CancellationToken cancellationToken)
+    public async Task<ChecklistItemResponseDto> CreateAsync(Guid travelPlanId, CreateChecklistItemRequestDto request, CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
         var now = DateTime.UtcNow;
@@ -61,9 +61,9 @@ public sealed class ChecklistService : IChecklistService
         return Map(entity);
     }
 
-    public async Task<ChecklistItemResponseDto?> UpdateAsync(Guid userId, Guid travelPlanId, Guid itemId, UpdateChecklistItemRequestDto request, CancellationToken cancellationToken)
+    public async Task<ChecklistItemResponseDto?> UpdateAsync(Guid travelPlanId, Guid itemId, UpdateChecklistItemRequestDto request, CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return null;
 
         var entity = await _db.ChecklistItems
@@ -79,9 +79,9 @@ public sealed class ChecklistService : IChecklistService
         return Map(entity);
     }
 
-    public async Task<ChecklistItemResponseDto?> ToggleAsync(Guid userId, Guid travelPlanId, Guid itemId, bool isDone, CancellationToken cancellationToken)
+    public async Task<ChecklistItemResponseDto?> ToggleAsync(Guid travelPlanId, Guid itemId, bool isDone, CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return null;
 
         var entity = await _db.ChecklistItems
@@ -96,9 +96,9 @@ public sealed class ChecklistService : IChecklistService
         return Map(entity);
     }
 
-    public async Task<bool> DeleteAsync(Guid userId, Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
+    public async Task<bool> DeleteAsync(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return false;
 
         var entity = await _db.ChecklistItems
@@ -111,10 +111,10 @@ public sealed class ChecklistService : IChecklistService
         return true;
     }
 
-    private async Task<bool> PlanOwnedAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
     }
 
     private static ChecklistItemResponseDto Map(ChecklistItemEntity e) =>

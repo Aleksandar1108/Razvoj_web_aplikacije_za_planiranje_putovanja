@@ -14,10 +14,10 @@ public sealed class DestinationService : IDestinationService
         _db = db;
     }
 
-    public async Task<TravelPlanRowEntity?> GetOwnedPlanAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TravelDestinationResponseDto>> ListByTravelPlanIdAsync(
@@ -34,12 +34,11 @@ public sealed class DestinationService : IDestinationService
     }
 
     public async Task<TravelDestinationResponseDto?> GetAsync(
-        Guid userId,
         Guid travelPlanId,
         Guid destinationId,
         CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return null;
 
         var row = await _db.TravelDestinations.AsNoTracking()
@@ -50,13 +49,12 @@ public sealed class DestinationService : IDestinationService
     }
 
     public async Task<TravelDestinationResponseDto> CreateAsync(
-        Guid userId,
         Guid travelPlanId,
         CreateTravelDestinationRequestDto request,
         CancellationToken cancellationToken)
     {
         var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
         if (plan is null)
             throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
@@ -84,14 +82,13 @@ public sealed class DestinationService : IDestinationService
     }
 
     public async Task<TravelDestinationResponseDto?> UpdateAsync(
-        Guid userId,
         Guid travelPlanId,
         Guid destinationId,
         UpdateTravelDestinationRequestDto request,
         CancellationToken cancellationToken)
     {
         var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
         if (plan is null)
             return null;
 
@@ -116,12 +113,11 @@ public sealed class DestinationService : IDestinationService
     }
 
     public async Task<bool> DeleteAsync(
-        Guid userId,
         Guid travelPlanId,
         Guid destinationId,
         CancellationToken cancellationToken)
     {
-        if (!await PlanOwnedAsync(userId, travelPlanId, cancellationToken))
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             return false;
 
         var entity = await _db.TravelDestinations
@@ -134,10 +130,10 @@ public sealed class DestinationService : IDestinationService
         return true;
     }
 
-    private async Task<bool> PlanOwnedAsync(Guid userId, Guid travelPlanId, CancellationToken cancellationToken)
+    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId && p.UserId == userId, cancellationToken);
+            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
     }
 
     private static void ValidateAgainstPlan(DateOnly arrival, DateOnly departure, TravelPlanRowEntity plan)

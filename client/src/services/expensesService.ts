@@ -14,37 +14,59 @@ function requireBase(): string {
   return b;
 }
 
-export async function listExpenses(planId: string, accessToken: string | null): Promise<TravelExpense[]> {
+export async function listExpenses(
+  planId: string,
+  accessToken: string | null,
+  shareToken?: string | null
+): Promise<TravelExpense[]> {
   const base = requireBase();
-  return apiRequestWithBase<TravelExpense[]>(base, basePath(planId), { method: 'GET' }, accessToken);
+  return apiRequestWithBase<TravelExpense[]>(base, basePath(planId), { method: 'GET' }, accessToken, shareToken ?? null);
 }
 
-export async function getExpense(planId: string, expenseId: string, accessToken: string | null): Promise<TravelExpense> {
+export async function getExpense(
+  planId: string,
+  expenseId: string,
+  accessToken: string | null,
+  shareToken?: string | null
+): Promise<TravelExpense> {
   const base = requireBase();
   return apiRequestWithBase<TravelExpense>(
     base,
     `${basePath(planId)}/${encodeURIComponent(expenseId)}`,
     { method: 'GET' },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
-export async function getExpenseSummary(planId: string, accessToken: string | null): Promise<ExpenseSummary> {
+export async function getExpenseSummary(
+  planId: string,
+  accessToken: string | null,
+  shareToken?: string | null
+): Promise<ExpenseSummary> {
   const base = requireBase();
-  return apiRequestWithBase<ExpenseSummary>(base, `${basePath(planId)}/summary`, { method: 'GET' }, accessToken);
+  return apiRequestWithBase<ExpenseSummary>(
+    base,
+    `${basePath(planId)}/summary`,
+    { method: 'GET' },
+    accessToken,
+    shareToken ?? null
+  );
 }
 
 export async function createExpense(
   planId: string,
   body: TravelExpenseUpsert,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<TravelExpense> {
   const base = requireBase();
   return apiRequestWithBase<TravelExpense>(
     base,
     basePath(planId),
     { method: 'POST', body: JSON.stringify(body) },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
@@ -52,27 +74,31 @@ export async function updateExpense(
   planId: string,
   expenseId: string,
   body: TravelExpenseUpsert,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<TravelExpense> {
   const base = requireBase();
   return apiRequestWithBase<TravelExpense>(
     base,
     `${basePath(planId)}/${encodeURIComponent(expenseId)}`,
     { method: 'PUT', body: JSON.stringify(body) },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }
 
 export async function deleteExpense(
   planId: string,
   expenseId: string,
-  accessToken: string | null
+  accessToken: string | null,
+  shareToken?: string | null
 ): Promise<void> {
   const base = requireBase();
   await apiRequestWithBase<unknown>(
     base,
     `${basePath(planId)}/${encodeURIComponent(expenseId)}`,
     { method: 'DELETE' },
-    accessToken
+    accessToken,
+    shareToken ?? null
   );
 }

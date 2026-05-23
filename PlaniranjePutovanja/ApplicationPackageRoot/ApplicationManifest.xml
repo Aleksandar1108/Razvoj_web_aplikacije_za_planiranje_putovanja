@@ -13,6 +13,8 @@
     <Parameter Name="ExpensesApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ExpensesApi-PlaniranjePutovanja" />
     <Parameter Name="ChecklistApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
     <Parameter Name="ChecklistApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=ChecklistApi-PlaniranjePutovanja" />
+    <Parameter Name="SharingApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
+    <Parameter Name="SharingApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=SharingApi-PlaniranjePutovanja" />
   </Parameters>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="Web1Pkg" ServiceManifestVersion="1.0.0" />
@@ -60,6 +62,14 @@
     <EnvironmentOverrides CodePackageRef="code">
       <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[ChecklistApi_ASPNETCORE_ENVIRONMENT]" />
       <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[ChecklistApi_DefaultConnection]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="SharingApiPkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[SharingApi_ASPNETCORE_ENVIRONMENT]" />
+      <EnvironmentVariable Name="ConnectionStrings__DefaultConnection" Value="[SharingApi_DefaultConnection]" />
     </EnvironmentOverrides>
   </ServiceManifestImport>
 </ApplicationManifest>

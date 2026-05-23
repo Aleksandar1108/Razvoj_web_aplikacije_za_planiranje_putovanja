@@ -1,6 +1,5 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using ChecklistApi.Dtos;
+using ChecklistApi.Infrastructure;
 using ChecklistApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,15 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace ChecklistApi.Controllers;
 
 [ApiController]
-[Authorize]
-[Route("api/v1/travel-plans/{travelPlanId:guid}/checklist")]
+[AllowAnonymous]
+[Route("api/v1/travel-plans/{travelPlanId:guid}/checklist-items")]
 public sealed class TravelPlanChecklistController : ControllerBase
 {
     private readonly IChecklistService _checklist;
+    private readonly ITravelPlanAccessGuard _access;
 
-    public TravelPlanChecklistController(IChecklistService checklist)
+    public TravelPlanChecklistController(IChecklistService checklist, ITravelPlanAccessGuard access)
     {
         _checklist = checklist;
+        _access = access;
     }
 
     [HttpGet]
@@ -24,10 +25,9 @@ public sealed class TravelPlanChecklistController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<ChecklistItemResponseDto>>> List(Guid travelPlanId, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        if (await _checklist.GetOwnedPlanAsync(userId, travelPlanId, cancellationToken) is null)
-            return NotFound();
         var list = await _checklist.ListByTravelPlanIdAsync(travelPlanId, cancellationToken);
         return Ok(list);
     }
@@ -43,12 +43,15 @@ public sealed class TravelPlanChecklistController : ControllerBase
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
 
         try
         {
-            var created = await _checklist.CreateAsync(userId, travelPlanId, request, cancellationToken);
+            var created = await _checklist.CreateAsync(travelPlanId, request, cancellationToken);
             return CreatedAtAction(nameof(Get), new { travelPlanId, itemId = created.Id }, created);
         }
         catch (InvalidOperationException)
@@ -62,9 +65,10 @@ public sealed class TravelPlanChecklistController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ChecklistItemResponseDto>> Get(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var dto = await _checklist.GetAsync(userId, travelPlanId, itemId, cancellationToken);
+        var dto = await _checklist.GetAsync(travelPlanId, itemId, cancellationToken);
         return dto is null ? NotFound() : Ok(dto);
     }
 
@@ -80,10 +84,13 @@ public sealed class TravelPlanChecklistController : ControllerBase
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
 
-        var updated = await _checklist.UpdateAsync(userId, travelPlanId, itemId, request, cancellationToken);
+        var updated = await _checklist.UpdateAsync(travelPlanId, itemId, request, cancellationToken);
         return updated is null ? NotFound() : Ok(updated);
     }
 
@@ -96,9 +103,12 @@ public sealed class TravelPlanChecklistController : ControllerBase
         [FromBody] ToggleChecklistItemRequestDto request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var updated = await _checklist.ToggleAsync(userId, travelPlanId, itemId, request.IsDone, cancellationToken);
+        if (!access.CanMutate)
+            return Forbid();
+        var updated = await _checklist.ToggleAsync(travelPlanId, itemId, request.IsDone, cancellationToken);
         return updated is null ? NotFound() : Ok(updated);
     }
 
@@ -107,16 +117,12 @@ public sealed class TravelPlanChecklistController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
+        var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
             return Unauthorized();
-        var ok = await _checklist.DeleteAsync(userId, travelPlanId, itemId, cancellationToken);
+        if (!access.CanMutate)
+            return Forbid();
+        var ok = await _checklist.DeleteAsync(travelPlanId, itemId, cancellationToken);
         return ok ? NoContent() : NotFound();
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return Guid.TryParse(raw, out userId);
     }
 }
