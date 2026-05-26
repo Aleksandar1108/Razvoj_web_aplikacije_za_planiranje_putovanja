@@ -1,3 +1,5 @@
+using CrossService.Clients;
+using CrossService.Dtos;
 using Microsoft.EntityFrameworkCore;
 using SharingApi.Data;
 using SharingApi.Data.Entities;
@@ -9,10 +11,12 @@ namespace SharingApi.Services;
 public sealed class SharingService : ISharingService
 {
     private readonly SharingDbContext _db;
+    private readonly ITravelPlansInternalClient _travelPlans;
 
-    public SharingService(SharingDbContext db)
+    public SharingService(SharingDbContext db, ITravelPlansInternalClient travelPlans)
     {
         _db = db;
+        _travelPlans = travelPlans;
     }
 
     public async Task<CreateTravelPlanShareLinkResponseDto> CreateShareLinkAsync(
@@ -23,9 +27,8 @@ public sealed class SharingService : ISharingService
     {
         var permission = NormalizePermission(request.Permission);
 
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId && p.UserId == ownerUserId, cancellationToken);
-        if (plan is null)
+        var owner = await _travelPlans.GetOwnerAsync(travelPlanId, cancellationToken);
+        if (!owner.IsOwner || owner.OwnerUserId != ownerUserId)
             throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
         var token = ShareTokenCrypto.CreateOpaqueToken();
@@ -113,24 +116,32 @@ public sealed class SharingService : ISharingService
         Guid recipientUserId,
         CancellationToken cancellationToken)
     {
-        var rows = await (
-                from r in _db.TravelPlanShareRecipients.AsNoTracking()
-                join p in _db.TravelPlans.AsNoTracking() on r.TravelPlanId equals p.Id
-                where r.RecipientUserId == recipientUserId
-                orderby r.UpdatedAtUtc descending
-                select new SharedTravelPlanListItemDto
-                {
-                    TravelPlanId = r.TravelPlanId,
-                    Permission = r.Permission,
-                    Name = p.Name,
-                    ShortDescription = p.ShortDescription,
-                    StartDate = p.StartDate,
-                    EndDate = p.EndDate,
-                    UpdatedAtUtc = r.UpdatedAtUtc
-                })
+        var recipients = await _db.TravelPlanShareRecipients.AsNoTracking()
+            .Where(r => r.RecipientUserId == recipientUserId)
+            .OrderByDescending(r => r.UpdatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        return rows;
+        if (recipients.Count == 0)
+            return Array.Empty<SharedTravelPlanListItemDto>();
+
+        var planIds = recipients.Select(r => r.TravelPlanId).Distinct().ToList();
+        var plans = (await _travelPlans.GetMetaBatchAsync(planIds, cancellationToken))
+            .ToDictionary(p => p.Id);
+
+        return recipients.Select(r =>
+        {
+            plans.TryGetValue(r.TravelPlanId, out var plan);
+            return new SharedTravelPlanListItemDto
+            {
+                TravelPlanId = r.TravelPlanId,
+                Permission = r.Permission,
+                Name = plan?.Name ?? "Plan",
+                ShortDescription = plan?.ShortDescription ?? string.Empty,
+                StartDate = plan?.StartDate ?? DateOnly.MinValue,
+                EndDate = plan?.EndDate ?? DateOnly.MinValue,
+                UpdatedAtUtc = r.UpdatedAtUtc
+            };
+        }).ToList();
     }
 
     private static string NormalizePermission(string permission)

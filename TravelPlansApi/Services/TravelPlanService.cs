@@ -74,6 +74,49 @@ public sealed class TravelPlanService : ITravelPlanService
         if (entity is null)
             return null;
 
+        ApplyUpdate(entity, request);
+        await _db.SaveChangesAsync(cancellationToken);
+        return Map(entity);
+    }
+
+    public async Task<TravelPlanResponseDto?> UpdateByPlanIdAsync(
+        Guid planId,
+        UpdateTravelPlanRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var entity = await _db.TravelPlans.FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
+        if (entity is null)
+            return null;
+
+        ApplyUpdate(entity, request);
+        await _db.SaveChangesAsync(cancellationToken);
+        return Map(entity);
+    }
+
+    public async Task<bool> DeleteAsync(Guid userId, Guid planId, CancellationToken cancellationToken)
+    {
+        var entity = await _db.TravelPlans.FirstOrDefaultAsync(p => p.Id == planId && p.UserId == userId, cancellationToken);
+        if (entity is null)
+            return false;
+
+        _db.TravelPlans.Remove(entity);
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteByPlanIdAsync(Guid planId, CancellationToken cancellationToken)
+    {
+        var entity = await _db.TravelPlans.FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
+        if (entity is null)
+            return false;
+
+        _db.TravelPlans.Remove(entity);
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private static void ApplyUpdate(TravelPlanEntity entity, UpdateTravelPlanRequestDto request)
+    {
         var start = request.StartDate!.Value;
         var end = request.EndDate!.Value;
         if (end < start)
@@ -88,20 +131,6 @@ public sealed class TravelPlanService : ITravelPlanService
         entity.PlannedBudget = request.PlannedBudget;
         entity.GeneralNotes = string.IsNullOrWhiteSpace(request.GeneralNotes) ? null : request.GeneralNotes.Trim();
         entity.UpdatedAtUtc = DateTime.UtcNow;
-
-        await _db.SaveChangesAsync(cancellationToken);
-        return Map(entity);
-    }
-
-    public async Task<bool> DeleteAsync(Guid userId, Guid planId, CancellationToken cancellationToken)
-    {
-        var entity = await _db.TravelPlans.FirstOrDefaultAsync(p => p.Id == planId && p.UserId == userId, cancellationToken);
-        if (entity is null)
-            return false;
-
-        _db.TravelPlans.Remove(entity);
-        await _db.SaveChangesAsync(cancellationToken);
-        return true;
     }
 
     private static TravelPlanResponseDto Map(TravelPlanEntity e) =>

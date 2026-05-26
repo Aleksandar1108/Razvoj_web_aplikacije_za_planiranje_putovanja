@@ -13,10 +13,6 @@ function requireAuthBase(): string {
   return base;
 }
 
-/**
- * HTTP pozivi za autentikaciju. Komponente ne zovu `fetch` direktno — koriste `AuthContext`,
- * koji interno koristi ovaj servis.
- */
 export const authService = {
   async register(payload: RegisterRequest): Promise<AuthResponse> {
     const base = requireAuthBase();

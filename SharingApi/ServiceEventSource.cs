@@ -5,11 +5,6 @@ using Microsoft.ServiceFabric.Services.Runtime;
 
 namespace SharingApi;
 
-/// <summary>
-/// ETW EventSource usklađen sa ostalim mikroservisima (javna Keywords klasa, ID događaja 1–4).
-/// Ranija verzija (privatna Keywords + pogrešan ID za ServiceMessage) izazivala je grešku:
-/// „Use of undefined keyword value 0x1 for event ServiceMessage“ pri pokretanju u Service Fabric-u.
-/// </summary>
 [EventSource(Name = "MyCompany-PlaniranjePutovanja-SharingApi")]
 internal sealed class ServiceEventSource : EventSource
 {

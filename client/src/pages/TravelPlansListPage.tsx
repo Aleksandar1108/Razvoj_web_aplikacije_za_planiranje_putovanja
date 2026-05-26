@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { listTravelPlans } from '../services/travelPlansService';
 import type { TravelPlan } from '../models/travelPlan';
 import { ApiError } from '../services/httpClient';
+import { formatMoneyEur } from '../utils/money';
 
 function formatShortDate(iso: string): string {
   try {
@@ -15,10 +16,6 @@ function formatShortDate(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function formatBudget(value: number): string {
-  return new Intl.NumberFormat('sr-Latn', { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(value);
 }
 
 function tripLengthDays(start: string, end: string): number {
@@ -64,10 +61,6 @@ export function TravelPlansListPage() {
         <div className="plans-hero-copy">
           <p className="plans-kicker">Tvoji planovi putovanja</p>
           <h1>Planovi putovanja</h1>
-          <p className="plans-lead">
-            Kreiraj putovanje sa nazivom, opisom, datumima, budžetom i napomenama. Lista i detalji su vezani za tvoj
-            nalog.
-          </p>
           <div className="plans-hero-actions">
             <Link to="/plans/new" className="btn btn-glow primary btn-lg">
               Novi plan
@@ -111,7 +104,7 @@ export function TravelPlansListPage() {
                   {formatShortDate(p.startDate)} — {formatShortDate(p.endDate)}
                 </span>
                 <span className="plan-budget" title="Planirani budžet">
-                  {p.plannedBudget > 0 ? `${formatBudget(p.plannedBudget)} €` : 'Budžet —'}
+                  {p.plannedBudget > 0 ? `${formatMoneyEur(p.plannedBudget)} €` : 'Budžet —'}
                 </span>
               </div>
             </Link>

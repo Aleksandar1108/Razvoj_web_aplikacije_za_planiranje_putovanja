@@ -1,5 +1,7 @@
 using System.Fabric;
+using System.Security.Claims;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,6 +13,8 @@ using DestinationsApi.Data;
 using DestinationsApi.Infrastructure;
 using DestinationsApi.Options;
 using DestinationsApi.Services;
+using CrossService;
+using CrossService.Access;
 
 namespace DestinationsApi;
 
@@ -53,8 +57,11 @@ internal sealed class DestinationsApiService : StatelessService
                     if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
                         throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
 
-                    builder.Services.AddScoped<ITravelPlanAccessGuard, TravelPlanAccessGuard>();
+                    builder.Services.AddCrossServiceClients(builder.Configuration);
+                    builder.Services.AddScoped<ITravelPlanAccessGuard, RemoteTravelPlanAccessGuard>();
                     builder.Services.AddScoped<IDestinationService, DestinationService>();
+                    builder.Services.AddScoped<IAdminDestinationService, AdminDestinationService>();
+                    builder.Services.AddScoped<IAdminPlanNotificationService, AdminPlanNotificationService>();
 
                     builder.Services.AddCors(options =>
                     {
@@ -78,7 +85,9 @@ internal sealed class DestinationsApiService : StatelessService
                                 ValidIssuer = jwt.Issuer,
                                 ValidAudience = jwt.Audience,
                                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                                ClockSkew = TimeSpan.FromMinutes(1)
+                                ClockSkew = TimeSpan.FromMinutes(1),
+                                NameClaimType = JwtRegisteredClaimNames.Sub,
+                                RoleClaimType = ClaimTypes.Role
                             };
                         });
 

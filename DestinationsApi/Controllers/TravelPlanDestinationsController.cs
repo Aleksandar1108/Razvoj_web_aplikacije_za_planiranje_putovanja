@@ -1,8 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DestinationsApi.Dtos;
-using DestinationsApi.Infrastructure;
 using DestinationsApi.Services;
+using CrossService.Access;
 
 namespace DestinationsApi.Controllers;
 
@@ -13,11 +15,23 @@ public sealed class TravelPlanDestinationsController : ControllerBase
 {
     private readonly IDestinationService _destinations;
     private readonly ITravelPlanAccessGuard _access;
+    private readonly IAdminPlanNotificationService _adminNotifications;
 
-    public TravelPlanDestinationsController(IDestinationService destinations, ITravelPlanAccessGuard access)
+    public TravelPlanDestinationsController(
+        IDestinationService destinations,
+        ITravelPlanAccessGuard access,
+        IAdminPlanNotificationService adminNotifications)
     {
         _destinations = destinations;
         _access = access;
+        _adminNotifications = adminNotifications;
+    }
+
+    private Guid? ActingUserId()
+    {
+        var raw = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(raw, out var id) ? id : null;
     }
 
     [HttpGet]
@@ -69,6 +83,7 @@ public sealed class TravelPlanDestinationsController : ControllerBase
         try
         {
             var created = await _destinations.CreateAsync(travelPlanId, request, cancellationToken);
+            await TryNotifyAdminActionAsync(access, travelPlanId, AdminMutationAction.Created, created.Name, created.Id, cancellationToken);
             return CreatedAtAction(
                 nameof(Get),
                 new { travelPlanId, destinationId = created.Id },
@@ -105,7 +120,11 @@ public sealed class TravelPlanDestinationsController : ControllerBase
         try
         {
             var updated = await _destinations.UpdateAsync(travelPlanId, destinationId, request, cancellationToken);
-            return updated is null ? NotFound() : Ok(updated);
+            if (updated is null)
+                return NotFound();
+
+            await TryNotifyAdminActionAsync(access, travelPlanId, AdminMutationAction.Updated, updated.Name, updated.Id, cancellationToken);
+            return Ok(updated);
         }
         catch (ArgumentException ex)
         {
@@ -126,7 +145,55 @@ public sealed class TravelPlanDestinationsController : ControllerBase
             return Unauthorized();
         if (!access.CanMutate)
             return Forbid();
+
+        string? nameForNotify = null;
+        if (access.IsAdminOverride)
+        {
+            var existing = await _destinations.GetAsync(travelPlanId, destinationId, cancellationToken);
+            nameForNotify = existing?.Name;
+        }
+
         var ok = await _destinations.DeleteAsync(travelPlanId, destinationId, cancellationToken);
-        return ok ? NoContent() : NotFound();
+        if (!ok)
+            return NotFound();
+
+        if (access.IsAdminOverride)
+        {
+            await TryNotifyAdminActionAsync(
+                access,
+                travelPlanId,
+                AdminMutationAction.Deleted,
+                nameForNotify ?? "destinacija",
+                destinationId,
+                cancellationToken);
+        }
+
+        return NoContent();
+    }
+
+    private async Task TryNotifyAdminActionAsync(
+        TravelPlanAccessResolution access,
+        Guid travelPlanId,
+        AdminMutationAction action,
+        string destinationName,
+        Guid destinationId,
+        CancellationToken cancellationToken)
+    {
+        if (!access.IsAdminOverride)
+            return;
+
+        var adminId = ActingUserId();
+        if (adminId is null)
+            return;
+
+        await _adminNotifications.NotifyPlanOwnerAsync(
+            adminId.Value,
+            travelPlanId,
+            AdminNotificationCategories.Destination,
+            action,
+            destinationName,
+            destinationId,
+            null,
+            cancellationToken);
     }
 }

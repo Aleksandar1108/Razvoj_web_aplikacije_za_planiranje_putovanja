@@ -157,7 +157,6 @@ a {
     0 16px 40px rgba(37, 99, 235, 0.38);
 }
 
-/* ——— Dobrodošlica (home) ——— */
 .home-page {
   position: relative;
   max-width: 100%;
@@ -386,7 +385,6 @@ a {
   color: var(--muted);
 }
 
-/* ——— Auth (prijava / registracija) ——— */
 .auth-page {
   position: relative;
   min-height: calc(100vh - 120px);
@@ -643,6 +641,127 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+.notifications-wrap {
+  position: relative;
+}
+
+.notifications-trigger {
+  position: relative;
+}
+
+.notifications-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.55rem;
+  min-width: 2.5rem;
+}
+
+.notifications-bell-icon {
+  display: block;
+  color: var(--text);
+}
+
+.admin-plan-banner {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.notifications-trigger-icon .notifications-badge {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.05rem;
+  margin-left: 0;
+}
+
+.notifications-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #dc2626;
+  color: #fff;
+  vertical-align: middle;
+}
+
+.notifications-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  z-index: 50;
+  width: min(22rem, 92vw);
+  max-height: 24rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: 14px;
+}
+
+.notifications-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.notifications-empty {
+  padding: 1rem 0.9rem;
+  margin: 0;
+}
+
+.notifications-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  max-height: 18rem;
+}
+
+.notifications-item {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  cursor: pointer;
+}
+
+.notifications-item.unread {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.notifications-item-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  margin-bottom: 0.2rem;
+}
+
+.notifications-item-msg {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.notifications-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.notifications-plan-link {
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .plans-hero {
@@ -1185,6 +1304,17 @@ h1 {
   color: #1e40af;
 }
 
+.plan-detail-budget-remaining {
+  color: #0f766e;
+}
+
+.budget-osnovno-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
 .plan-notes {
   margin: 0;
   white-space: pre-wrap;
@@ -1468,6 +1598,20 @@ h1 {
 
 .calendar-popover-header .calendar-selected-title {
   margin: 0;
+}
+
+.calendar-popover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.calendar-popover-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
 }
 
 .calendar-popover-list {

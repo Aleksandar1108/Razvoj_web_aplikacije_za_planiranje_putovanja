@@ -1,4 +1,3 @@
-/** Odgovara JSON-u iz TravelPlansApi (DateOnly kao ISO datum). */
 export type TravelPlan = {
   id: string;
   name: string;

@@ -1,4 +1,3 @@
-/** JSON iz DestinationsApi (DateOnly kao ISO datum). */
 export type TravelDestination = {
   id: string;
   travelPlanId: string;

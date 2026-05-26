@@ -61,7 +61,6 @@ export function ImportShareQrPage() {
         return;
       }
 
-      // Fallback: ako je u QR samo token string
       const token = qr.data.trim();
       if (token.length < 10) throw new Error('QR sadržaj nije validan.');
 

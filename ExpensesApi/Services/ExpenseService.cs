@@ -1,3 +1,4 @@
+using CrossService.Clients;
 using ExpensesApi.Data;
 using ExpensesApi.Data.Entities;
 using ExpensesApi.Dtos;
@@ -8,16 +9,17 @@ namespace ExpensesApi.Services;
 public sealed class ExpenseService : IExpenseService
 {
     private readonly ExpensesDbContext _db;
+    private readonly ITravelPlansInternalClient _travelPlans;
+    private readonly IActivitiesInternalClient _activities;
 
-    public ExpenseService(ExpensesDbContext db)
+    public ExpenseService(
+        ExpensesDbContext db,
+        ITravelPlansInternalClient travelPlans,
+        IActivitiesInternalClient activities)
     {
         _db = db;
-    }
-
-    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        _travelPlans = travelPlans;
+        _activities = activities;
     }
 
     public async Task<IReadOnlyList<TravelExpenseResponseDto>> ListByTravelPlanIdAsync(
@@ -51,9 +53,7 @@ public sealed class ExpenseService : IExpenseService
         CreateTravelExpenseRequestDto request,
         CancellationToken cancellationToken)
     {
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
-        if (plan is null)
+        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
             throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
         var category = NormalizeCategory(request.Category);
@@ -126,17 +126,14 @@ public sealed class ExpenseService : IExpenseService
 
     public async Task<ExpenseSummaryDto?> GetSummaryAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken);
         if (plan is null)
             return null;
 
         var total = await _db.TravelExpenses.AsNoTracking()
             .Where(e => e.TravelPlanId == travelPlanId)
             .SumAsync(e => (decimal?)e.Amount, cancellationToken) ?? 0m;
-        var totalActivityEstimatedCosts = await _db.TravelActivities.AsNoTracking()
-            .Where(a => a.TravelPlanId == travelPlanId)
-            .SumAsync(a => (decimal?)a.EstimatedCost, cancellationToken) ?? 0m;
+        var totalActivityEstimatedCosts = await _activities.GetEstimatedCostSumAsync(travelPlanId, cancellationToken);
         var totalCombined = total + totalActivityEstimatedCosts;
 
         return new ExpenseSummaryDto
@@ -149,11 +146,8 @@ public sealed class ExpenseService : IExpenseService
         };
     }
 
-    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
-    }
+    private Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
+        _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 
     private static void ValidateAmount(decimal amount)
     {

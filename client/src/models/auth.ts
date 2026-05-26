@@ -1,5 +1,3 @@
-/** Modeli usklađeni sa backend DTO (JSON camelCase). */
-
 export interface RegisterRequest {
   firstName: string;
   lastName: string;

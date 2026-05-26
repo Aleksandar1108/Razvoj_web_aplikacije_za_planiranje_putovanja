@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { NotificationsBell } from './NotificationsBell';
 
 export function AppHeader() {
   const { accessToken, user, logout } = useAuth();
@@ -22,7 +23,7 @@ export function AppHeader() {
         ) : (
           <>
             <NavLink to="/plans" className={({ isActive }) => (isActive ? 'active' : '')}>
-              Planovi
+              {user?.role === 'Admin' ? 'Vaši planovi' : 'Planovi'}
             </NavLink>
             <NavLink to="/shared-plans" className={({ isActive }) => (isActive ? 'active' : '')}>
               Deljeni planovi
@@ -30,10 +31,16 @@ export function AppHeader() {
             <NavLink to="/share/qr" className={({ isActive }) => (isActive ? 'active' : '')}>
               Učitaj QR
             </NavLink>
+            <NotificationsBell />
             {user?.role === 'Admin' ? (
-              <NavLink to="/admin/korisnici" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Admin
-              </NavLink>
+              <>
+                <NavLink to="/admin/planovi" className={({ isActive }) => (isActive ? 'active' : '')}>
+                  Upravljanje planovima
+                </NavLink>
+                <NavLink to="/admin/korisnici" className={({ isActive }) => (isActive ? 'active' : '')}>
+                  Korisnici
+                </NavLink>
+              </>
             ) : null}
             <span className="muted">
               {[user?.firstName, user?.lastName].filter(Boolean).join(' ')}{' '}

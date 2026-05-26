@@ -1,12 +1,9 @@
-using DestinationsApi.Data.Entities;
 using DestinationsApi.Dtos;
 
 namespace DestinationsApi.Services;
 
 public interface IDestinationService
 {
-    Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken);
-
     Task<IReadOnlyList<TravelDestinationResponseDto>> ListByTravelPlanIdAsync(
         Guid travelPlanId,
         CancellationToken cancellationToken);

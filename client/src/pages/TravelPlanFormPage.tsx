@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { createTravelPlan, getTravelPlan, updateTravelPlan } from '../services/travelPlansService';
 import type { TravelPlanUpsert } from '../models/travelPlan';
 import { ApiError } from '../services/httpClient';
+import { roundMoney } from '../utils/money';
 
 function emptyForm(): TravelPlanUpsert {
   return {
@@ -42,7 +43,7 @@ export function TravelPlanFormPage() {
           shortDescription: p.shortDescription,
           startDate: p.startDate,
           endDate: p.endDate,
-          plannedBudget: p.plannedBudget,
+          plannedBudget: roundMoney(p.plannedBudget),
           generalNotes: p.generalNotes ?? '',
         });
       } catch (e) {
@@ -82,6 +83,7 @@ export function TravelPlanFormPage() {
 
     const payload: TravelPlanUpsert = {
       ...form,
+      plannedBudget: roundMoney(form.plannedBudget),
       generalNotes: form.generalNotes?.trim() ? form.generalNotes.trim() : null,
     };
     try {
@@ -183,7 +185,7 @@ export function TravelPlanFormPage() {
                 type="number"
                 inputMode="decimal"
                 min={0}
-                step={0.01}
+                step={1}
                 className="input-currency"
                 placeholder={isEdit ? undefined : 'npr. 1500'}
                 value={budgetInputValue}

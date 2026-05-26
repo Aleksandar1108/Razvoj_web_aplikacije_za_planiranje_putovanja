@@ -11,6 +11,7 @@ using SharingApi.Data;
 using SharingApi.Infrastructure;
 using SharingApi.Options;
 using SharingApi.Services;
+using CrossService;
 
 namespace SharingApi;
 
@@ -53,6 +54,7 @@ internal sealed class SharingApiService : StatelessService
                     if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
                         throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
 
+                    builder.Services.AddCrossServiceClients(builder.Configuration);
                     builder.Services.AddScoped<ISharingService, SharingService>();
 
                     builder.Services.AddCors(options =>

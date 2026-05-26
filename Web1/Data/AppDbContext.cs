@@ -12,6 +12,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
+    public DbSet<UserNotificationEntity> UserNotifications => Set<UserNotificationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,17 @@ public sealed class AppDbContext : DbContext
                 .WithMany(x => x.Users)
                 .HasForeignKey(x => x.RoleId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserNotificationEntity>(e =>
+        {
+            e.ToTable("UserNotifications");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Category).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Message).HasMaxLength(1000).IsRequired();
+            e.HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAtUtc })
+                .HasDatabaseName("IX_UserNotifications_UserId_IsRead_Created");
         });
     }
 }

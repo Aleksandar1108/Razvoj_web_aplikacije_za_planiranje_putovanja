@@ -1,6 +1,8 @@
 using ActivitiesApi.Data;
 using ActivitiesApi.Data.Entities;
 using ActivitiesApi.Dtos;
+using CrossService.Clients;
+using CrossService.Dtos;
 using Microsoft.EntityFrameworkCore;
 
 namespace ActivitiesApi.Services;
@@ -8,16 +10,12 @@ namespace ActivitiesApi.Services;
 public sealed class ActivityService : IActivityService
 {
     private readonly ActivitiesDbContext _db;
+    private readonly ITravelPlansInternalClient _travelPlans;
 
-    public ActivityService(ActivitiesDbContext db)
+    public ActivityService(ActivitiesDbContext db, ITravelPlansInternalClient travelPlans)
     {
         _db = db;
-    }
-
-    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        _travelPlans = travelPlans;
     }
 
     public async Task<IReadOnlyList<TravelActivityResponseDto>> ListByTravelPlanIdAsync(
@@ -54,10 +52,8 @@ public sealed class ActivityService : IActivityService
         CreateTravelActivityRequestDto request,
         CancellationToken cancellationToken)
     {
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
-        if (plan is null)
-            throw new InvalidOperationException("Plan putovanja nije pronađen.");
+        var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken)
+                   ?? throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
         var date = request.ActivityDate!.Value;
         ValidateAgainstPlan(date, plan);
@@ -91,8 +87,7 @@ public sealed class ActivityService : IActivityService
         UpdateTravelActivityRequestDto request,
         CancellationToken cancellationToken)
     {
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken);
         if (plan is null)
             return null;
 
@@ -137,13 +132,10 @@ public sealed class ActivityService : IActivityService
         return true;
     }
 
-    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
-    }
+    private Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
+        _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 
-    private static void ValidateAgainstPlan(DateOnly activityDate, TravelPlanRowEntity plan)
+    private static void ValidateAgainstPlan(DateOnly activityDate, TravelPlanMetaDto plan)
     {
         if (activityDate < plan.StartDate || activityDate > plan.EndDate)
             throw new ArgumentException("Datum aktivnosti mora biti u okviru datuma plana putovanja.");

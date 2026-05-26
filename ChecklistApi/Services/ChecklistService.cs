@@ -1,6 +1,7 @@
 using ChecklistApi.Data;
 using ChecklistApi.Data.Entities;
 using ChecklistApi.Dtos;
+using CrossService.Clients;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChecklistApi.Services;
@@ -8,16 +9,12 @@ namespace ChecklistApi.Services;
 public sealed class ChecklistService : IChecklistService
 {
     private readonly ChecklistDbContext _db;
+    private readonly ITravelPlansInternalClient _travelPlans;
 
-    public ChecklistService(ChecklistDbContext db)
+    public ChecklistService(ChecklistDbContext db, ITravelPlansInternalClient travelPlans)
     {
         _db = db;
-    }
-
-    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        _travelPlans = travelPlans;
     }
 
     public async Task<IReadOnlyList<ChecklistItemResponseDto>> ListByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken)
@@ -111,11 +108,8 @@ public sealed class ChecklistService : IChecklistService
         return true;
     }
 
-    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
-    }
+    private Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
+        _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 
     private static ChecklistItemResponseDto Map(ChecklistItemEntity e) =>
         new()

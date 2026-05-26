@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { AdminSystemStats, AdminUserRow } from '../models/admin';
 import { adminService } from '../services/adminService';
@@ -74,6 +75,11 @@ export function AdminUsersPage() {
             Pregled naloga, uloga (User / Admin) i statusa aktivnosti. Ne možeš ukloniti Admin ulogu sa sopstvenog
             naloga niti ga deaktivirati.
           </p>
+          <div className="form-actions" style={{ marginTop: '1rem' }}>
+            <Link to="/admin/planovi" className="btn ghost">
+              Upravljanje planovima
+            </Link>
+          </div>
         </div>
       </section>
 

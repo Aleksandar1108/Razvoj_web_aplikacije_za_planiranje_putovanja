@@ -18,7 +18,6 @@ public sealed class AuthController : ControllerBase
         _auth = auth;
     }
 
-    /// <summary>Registracija novog korisnika (uloga User).</summary>
     [HttpPost("register")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -41,7 +40,6 @@ public sealed class AuthController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result.Data);
     }
 
-    /// <summary>Prijava korisnika; vraća JWT access token.</summary>
     [HttpPost("login")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -68,7 +66,6 @@ public sealed class AuthController : ControllerBase
         return Ok(result.Data);
     }
 
-    /// <summary>Podaci iz JWT (za test validacije potpisa i isteka).</summary>
     [HttpGet("me")]
     [Authorize]
     [ProducesResponseType(typeof(AuthUserDto), StatusCodes.Status200OK)]

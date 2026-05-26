@@ -1,6 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using ActivitiesApi.Dtos;
-using ActivitiesApi.Infrastructure;
 using ActivitiesApi.Services;
+using CrossService.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,16 +15,20 @@ public sealed class TravelPlanActivitiesController : ControllerBase
 {
     private readonly IActivityService _activities;
     private readonly ITravelPlanAccessGuard _access;
+    private readonly IAdminPlanNotificationService _adminNotifications;
 
-    public TravelPlanActivitiesController(IActivityService activities, ITravelPlanAccessGuard access)
+    public TravelPlanActivitiesController(
+        IActivityService activities,
+        ITravelPlanAccessGuard access,
+        IAdminPlanNotificationService adminNotifications)
     {
         _activities = activities;
         _access = access;
+        _adminNotifications = adminNotifications;
     }
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<TravelActivityResponseDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<TravelActivityResponseDto>>> List(
         Guid travelPlanId,
         CancellationToken cancellationToken)
@@ -30,13 +36,11 @@ public sealed class TravelPlanActivitiesController : ControllerBase
         var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
         if (!access.IsAllowed)
             return Unauthorized();
-        var list = await _activities.ListByTravelPlanIdAsync(travelPlanId, cancellationToken);
-        return Ok(list);
+        return Ok(await _activities.ListByTravelPlanIdAsync(travelPlanId, cancellationToken));
     }
 
     [HttpGet("{activityId:guid}")]
     [ProducesResponseType(typeof(TravelActivityResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TravelActivityResponseDto>> Get(
         Guid travelPlanId,
         Guid activityId,
@@ -51,8 +55,6 @@ public sealed class TravelPlanActivitiesController : ControllerBase
 
     [HttpPost]
     [ProducesResponseType(typeof(TravelActivityResponseDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TravelActivityResponseDto>> Create(
         Guid travelPlanId,
         [FromBody] CreateTravelActivityRequestDto request,
@@ -69,10 +71,8 @@ public sealed class TravelPlanActivitiesController : ControllerBase
         try
         {
             var created = await _activities.CreateAsync(travelPlanId, request, cancellationToken);
-            return CreatedAtAction(
-                nameof(Get),
-                new { travelPlanId, activityId = created.Id },
-                created);
+            await TryNotifyAsync(access, travelPlanId, AdminMutationAction.Created, created.Name, created.Id, null, cancellationToken);
+            return CreatedAtAction(nameof(Get), new { travelPlanId, activityId = created.Id }, created);
         }
         catch (InvalidOperationException)
         {
@@ -86,8 +86,6 @@ public sealed class TravelPlanActivitiesController : ControllerBase
 
     [HttpPut("{activityId:guid}")]
     [ProducesResponseType(typeof(TravelActivityResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TravelActivityResponseDto>> Update(
         Guid travelPlanId,
         Guid activityId,
@@ -105,7 +103,10 @@ public sealed class TravelPlanActivitiesController : ControllerBase
         try
         {
             var updated = await _activities.UpdateAsync(travelPlanId, activityId, request, cancellationToken);
-            return updated is null ? NotFound() : Ok(updated);
+            if (updated is null)
+                return NotFound();
+            await TryNotifyAsync(access, travelPlanId, AdminMutationAction.Updated, updated.Name, updated.Id, null, cancellationToken);
+            return Ok(updated);
         }
         catch (ArgumentException ex)
         {
@@ -115,18 +116,58 @@ public sealed class TravelPlanActivitiesController : ControllerBase
 
     [HttpDelete("{activityId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(
-        Guid travelPlanId,
-        Guid activityId,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid travelPlanId, Guid activityId, CancellationToken cancellationToken)
     {
         var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
         if (!access.IsAllowed)
             return Unauthorized();
         if (!access.CanMutate)
             return Forbid();
+
+        string? name = null;
+        if (access.IsAdminOverride)
+        {
+            var existing = await _activities.GetAsync(travelPlanId, activityId, cancellationToken);
+            name = existing?.Name;
+        }
+
         var ok = await _activities.DeleteAsync(travelPlanId, activityId, cancellationToken);
-        return ok ? NoContent() : NotFound();
+        if (!ok)
+            return NotFound();
+
+        await TryNotifyAsync(access, travelPlanId, AdminMutationAction.Deleted, name ?? "aktivnost", activityId, null, cancellationToken);
+        return NoContent();
+    }
+
+    private async Task TryNotifyAsync(
+        TravelPlanAccessResolution access,
+        Guid travelPlanId,
+        AdminMutationAction action,
+        string itemLabel,
+        Guid? relatedId,
+        bool? checklistDone,
+        CancellationToken cancellationToken)
+    {
+        if (!access.IsAdminOverride)
+            return;
+        var adminId = ActingUserId();
+        if (adminId is null)
+            return;
+        await _adminNotifications.NotifyPlanOwnerAsync(
+            adminId.Value,
+            travelPlanId,
+            AdminNotificationCategories.Activity,
+            action,
+            itemLabel,
+            relatedId,
+            checklistDone,
+            cancellationToken);
+    }
+
+    private Guid? ActingUserId()
+    {
+        var raw = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(raw, out var id) ? id : null;
     }
 }

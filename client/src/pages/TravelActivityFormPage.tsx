@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getTravelPlan } from '../services/travelPlansService';
 import { createActivity, getActivity, updateActivity } from '../services/activitiesService';
@@ -22,6 +22,8 @@ function emptyForm(): TravelActivityUpsert {
 
 export function TravelActivityFormPage() {
   const { planId, activityId } = useParams<{ planId: string; activityId?: string }>();
+  const [searchParams] = useSearchParams();
+  const presetDate = (searchParams.get('date') ?? '').trim();
   const isEdit = Boolean(activityId);
   const navigate = useNavigate();
   const { accessToken } = useAuth();
@@ -57,7 +59,9 @@ export function TravelActivityFormPage() {
           });
           setEstimatedCostInput(String(a.estimatedCost));
         } else {
-          setForm((prev) => ({ ...prev, activityDate: p.startDate }));
+          const initialDate =
+            presetDate && presetDate >= p.startDate && presetDate <= p.endDate ? presetDate : p.startDate;
+          setForm((prev) => ({ ...prev, activityDate: initialDate }));
           setEstimatedCostInput('0');
         }
       } catch (e) {
@@ -69,7 +73,7 @@ export function TravelActivityFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [planId, activityId, isEdit, accessToken]);
+  }, [planId, activityId, isEdit, accessToken, presetDate]);
 
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();

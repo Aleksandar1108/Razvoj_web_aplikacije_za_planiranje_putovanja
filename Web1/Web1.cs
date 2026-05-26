@@ -21,22 +21,17 @@ using Web1.Infrastructure;
 using Web1.Options;
 using Web1.Services.Admin;
 using Web1.Services.Auth;
+using Web1.Services.Notifications;
+using CrossService;
 
 namespace Web1
 {
-    /// <summary>
-    /// The FabricRuntime creates an instance of this class for each service type instance.
-    /// </summary>
     internal sealed class Web1 : StatelessService
     {
         public Web1(StatelessServiceContext context)
             : base(context)
         { }
 
-        /// <summary>
-        /// Optional override to create listeners (like tcp, http) for this service instance.
-        /// </summary>
-        /// <returns>The collection of listeners.</returns>
         protected override IEnumerable<ServiceInstanceListener> CreateServiceInstanceListeners()
         {
             return new ServiceInstanceListener[]
@@ -69,8 +64,11 @@ namespace Web1
                         if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
                             throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera.");
 
+                        builder.Services.AddCrossServiceClients(builder.Configuration);
+
                         builder.Services.AddScoped<IAuthService, AuthService>();
                         builder.Services.AddScoped<IAdminService, AdminService>();
+                        builder.Services.AddScoped<INotificationService, NotificationService>();
 
                         builder.Services.AddCors(options =>
                         {
@@ -123,7 +121,6 @@ namespace Web1
                         app.UseAuthorization();
                         app.MapControllers();
 
-                        // Dijagnostika: ako ovde padne konekcija, problem je SQL string / login — ne auth kontroler.
                         app.MapGet("/api/v1/health", () => Results.Ok(new { status = "ok" }));
                         app.MapGet("/api/v1/health/db", async (AppDbContext db, CancellationToken ct) =>
                         {

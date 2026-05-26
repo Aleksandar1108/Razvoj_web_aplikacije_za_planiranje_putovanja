@@ -22,6 +22,5 @@ public enum AuthErrorCode
     Unauthorized,
     Forbidden,
     Validation,
-    /// <summary>Npr. SQL server nedostupan ili pogrešan connection string (često u Service Fabric okruženju).</summary>
     Database
 }

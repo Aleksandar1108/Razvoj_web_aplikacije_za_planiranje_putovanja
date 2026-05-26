@@ -14,5 +14,9 @@ public interface ITravelPlanService
 
     Task<TravelPlanResponseDto?> UpdateAsync(Guid userId, Guid planId, UpdateTravelPlanRequestDto request, CancellationToken cancellationToken);
 
+    Task<TravelPlanResponseDto?> UpdateByPlanIdAsync(Guid planId, UpdateTravelPlanRequestDto request, CancellationToken cancellationToken);
+
     Task<bool> DeleteAsync(Guid userId, Guid planId, CancellationToken cancellationToken);
+
+    Task<bool> DeleteByPlanIdAsync(Guid planId, CancellationToken cancellationToken);
 }

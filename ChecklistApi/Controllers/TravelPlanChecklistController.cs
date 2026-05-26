@@ -1,6 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using ChecklistApi.Dtos;
-using ChecklistApi.Infrastructure;
 using ChecklistApi.Services;
+using CrossService.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,29 +15,30 @@ public sealed class TravelPlanChecklistController : ControllerBase
 {
     private readonly IChecklistService _checklist;
     private readonly ITravelPlanAccessGuard _access;
+    private readonly IAdminPlanNotificationService _adminNotifications;
 
-    public TravelPlanChecklistController(IChecklistService checklist, ITravelPlanAccessGuard access)
+    public TravelPlanChecklistController(
+        IChecklistService checklist,
+        ITravelPlanAccessGuard access,
+        IAdminPlanNotificationService adminNotifications)
     {
         _checklist = checklist;
         _access = access;
+        _adminNotifications = adminNotifications;
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<ChecklistItemResponseDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IReadOnlyList<ChecklistItemResponseDto>>> List(Guid travelPlanId, CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<ChecklistItemResponseDto>>> List(
+        Guid travelPlanId,
+        CancellationToken cancellationToken)
     {
         var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
         if (!access.IsAllowed)
             return Unauthorized();
-        var list = await _checklist.ListByTravelPlanIdAsync(travelPlanId, cancellationToken);
-        return Ok(list);
+        return Ok(await _checklist.ListByTravelPlanIdAsync(travelPlanId, cancellationToken));
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(ChecklistItemResponseDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ChecklistItemResponseDto>> Create(
         Guid travelPlanId,
         [FromBody] CreateChecklistItemRequestDto request,
@@ -52,6 +55,7 @@ public sealed class TravelPlanChecklistController : ControllerBase
         try
         {
             var created = await _checklist.CreateAsync(travelPlanId, request, cancellationToken);
+            await TryNotifyAsync(access, travelPlanId, AdminMutationAction.Created, created.Title, created.Id, null, cancellationToken);
             return CreatedAtAction(nameof(Get), new { travelPlanId, itemId = created.Id }, created);
         }
         catch (InvalidOperationException)
@@ -61,9 +65,10 @@ public sealed class TravelPlanChecklistController : ControllerBase
     }
 
     [HttpGet("{itemId:guid}")]
-    [ProducesResponseType(typeof(ChecklistItemResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ChecklistItemResponseDto>> Get(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ChecklistItemResponseDto>> Get(
+        Guid travelPlanId,
+        Guid itemId,
+        CancellationToken cancellationToken)
     {
         var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: false, cancellationToken);
         if (!access.IsAllowed)
@@ -73,9 +78,6 @@ public sealed class TravelPlanChecklistController : ControllerBase
     }
 
     [HttpPut("{itemId:guid}")]
-    [ProducesResponseType(typeof(ChecklistItemResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ChecklistItemResponseDto>> Update(
         Guid travelPlanId,
         Guid itemId,
@@ -91,12 +93,13 @@ public sealed class TravelPlanChecklistController : ControllerBase
             return Forbid();
 
         var updated = await _checklist.UpdateAsync(travelPlanId, itemId, request, cancellationToken);
-        return updated is null ? NotFound() : Ok(updated);
+        if (updated is null)
+            return NotFound();
+        await TryNotifyAsync(access, travelPlanId, AdminMutationAction.Updated, updated.Title, updated.Id, null, cancellationToken);
+        return Ok(updated);
     }
 
     [HttpPatch("{itemId:guid}/toggle")]
-    [ProducesResponseType(typeof(ChecklistItemResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ChecklistItemResponseDto>> Toggle(
         Guid travelPlanId,
         Guid itemId,
@@ -109,12 +112,20 @@ public sealed class TravelPlanChecklistController : ControllerBase
         if (!access.CanMutate)
             return Forbid();
         var updated = await _checklist.ToggleAsync(travelPlanId, itemId, request.IsDone, cancellationToken);
-        return updated is null ? NotFound() : Ok(updated);
+        if (updated is null)
+            return NotFound();
+        await TryNotifyAsync(
+            access,
+            travelPlanId,
+            AdminMutationAction.Toggled,
+            updated.Title,
+            updated.Id,
+            updated.IsDone,
+            cancellationToken);
+        return Ok(updated);
     }
 
     [HttpDelete("{itemId:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken)
     {
         var access = await _access.ResolveAsync(HttpContext, travelPlanId, requiresMutation: true, cancellationToken);
@@ -122,7 +133,51 @@ public sealed class TravelPlanChecklistController : ControllerBase
             return Unauthorized();
         if (!access.CanMutate)
             return Forbid();
+
+        string? title = null;
+        if (access.IsAdminOverride)
+        {
+            var existing = await _checklist.GetAsync(travelPlanId, itemId, cancellationToken);
+            title = existing?.Title;
+        }
+
         var ok = await _checklist.DeleteAsync(travelPlanId, itemId, cancellationToken);
-        return ok ? NoContent() : NotFound();
+        if (!ok)
+            return NotFound();
+
+        await TryNotifyAsync(access, travelPlanId, AdminMutationAction.Deleted, title ?? "stavku", itemId, null, cancellationToken);
+        return NoContent();
+    }
+
+    private async Task TryNotifyAsync(
+        TravelPlanAccessResolution access,
+        Guid travelPlanId,
+        AdminMutationAction action,
+        string itemLabel,
+        Guid? relatedId,
+        bool? checklistDone,
+        CancellationToken cancellationToken)
+    {
+        if (!access.IsAdminOverride)
+            return;
+        var adminId = ActingUserId();
+        if (adminId is null)
+            return;
+        await _adminNotifications.NotifyPlanOwnerAsync(
+            adminId.Value,
+            travelPlanId,
+            AdminNotificationCategories.Checklist,
+            action,
+            itemLabel,
+            relatedId,
+            checklistDone,
+            cancellationToken);
+    }
+
+    private Guid? ActingUserId()
+    {
+        var raw = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(raw, out var id) ? id : null;
     }
 }

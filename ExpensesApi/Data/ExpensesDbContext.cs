@@ -11,20 +11,9 @@ public sealed class ExpensesDbContext : DbContext
     }
 
     public DbSet<TravelExpenseEntity> TravelExpenses => Set<TravelExpenseEntity>();
-    public DbSet<TravelPlanRowEntity> TravelPlans => Set<TravelPlanRowEntity>();
-    public DbSet<TravelActivityEntity> TravelActivities => Set<TravelActivityEntity>();
-    public DbSet<TravelPlanShareLinkEntity> TravelPlanShareLinks => Set<TravelPlanShareLinkEntity>();
-    public DbSet<TravelPlanShareRecipientEntity> TravelPlanShareRecipients => Set<TravelPlanShareRecipientEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<TravelPlanRowEntity>(e =>
-        {
-            e.ToTable("TravelPlans");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.PlannedBudget).HasPrecision(18, 2);
-        });
-
         modelBuilder.Entity<TravelExpenseEntity>(e =>
         {
             e.ToTable("TravelExpenses");
@@ -35,46 +24,6 @@ public sealed class ExpensesDbContext : DbContext
             e.Property(x => x.ExpenseDate).HasColumnType("date");
             e.Property(x => x.Description).HasMaxLength(2000);
             e.HasIndex(x => new { x.TravelPlanId, x.ExpenseDate }).HasDatabaseName("IX_TravelExpenses_TravelPlanId_Date");
-
-            e.HasOne<TravelPlanRowEntity>()
-                .WithMany()
-                .HasForeignKey(x => x.TravelPlanId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<TravelActivityEntity>(e =>
-        {
-            e.ToTable("TravelActivities");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.EstimatedCost).HasPrecision(18, 2);
-            e.HasIndex(x => x.TravelPlanId).HasDatabaseName("IX_TravelActivities_TravelPlanId");
-        });
-
-        modelBuilder.Entity<TravelPlanShareLinkEntity>(e =>
-        {
-            e.ToTable("TravelPlanShareLinks");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.TokenHash).HasColumnType("varbinary(32)").IsRequired();
-            e.Property(x => x.Permission).HasMaxLength(10).IsRequired();
-            e.HasIndex(x => x.TokenHash).IsUnique();
-
-            e.HasOne<TravelPlanRowEntity>()
-                .WithMany()
-                .HasForeignKey(x => x.TravelPlanId)
-                .OnDelete(DeleteBehavior.NoAction);
-        });
-
-        modelBuilder.Entity<TravelPlanShareRecipientEntity>(e =>
-        {
-            e.ToTable("TravelPlanShareRecipients");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Permission).HasMaxLength(10).IsRequired();
-            e.HasIndex(x => new { x.TravelPlanId, x.RecipientUserId }).IsUnique();
-
-            e.HasOne<TravelPlanRowEntity>()
-                .WithMany()
-                .HasForeignKey(x => x.TravelPlanId)
-                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

@@ -15,6 +15,7 @@ import type { ExpenseSummary, TravelExpense } from '../models/travelExpense';
 import type { ChecklistItem } from '../models/checklistItem';
 import type { SharePermission } from '../models/share';
 import { ApiError } from '../services/httpClient';
+import { formatMoneyEur, roundMoney } from '../utils/money';
 
 type PlanSection = 'osnovno' | 'destinacije' | 'troskovi' | 'aktivnosti' | 'kalendar' | 'checklista' | 'napomene';
 
@@ -41,10 +42,6 @@ function formatShortDate(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function formatBudget(value: number): string {
-  return new Intl.NumberFormat('sr-Latn', { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(value);
 }
 
 function formatTime(value: string): string {
@@ -74,15 +71,18 @@ function categoryLabel(category: string): string {
 }
 
 function buildSummary(plannedBudget: number, expenses: TravelExpense[], activities: TravelActivity[]): ExpenseSummary {
-  const totalExpenseEntries = expenses.reduce((sum, item) => sum + item.amount, 0);
-  const totalActivityEstimatedCosts = activities.reduce((sum, item) => sum + item.estimatedCost, 0);
-  const totalExpenses = totalExpenseEntries + totalActivityEstimatedCosts;
+  const totalExpenseEntries = roundMoney(expenses.reduce((sum, item) => sum + item.amount, 0));
+  const totalActivityEstimatedCosts = roundMoney(
+    activities.reduce((sum, item) => sum + item.estimatedCost, 0)
+  );
+  const totalExpenses = roundMoney(totalExpenseEntries + totalActivityEstimatedCosts);
+  const planned = roundMoney(plannedBudget);
   return {
-    plannedBudget,
+    plannedBudget: planned,
     totalExpenses,
     totalExpenseEntries,
     totalActivityEstimatedCosts,
-    remainingBudget: plannedBudget - totalExpenses,
+    remainingBudget: roundMoney(planned - totalExpenses),
   };
 }
 
@@ -110,7 +110,8 @@ function addDays(date: Date, days: number): Date {
 export function TravelPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
   const [searchParams] = useSearchParams();
   const shareHeaderToken = useMemo(() => {
     const raw = searchParams.get('t');
@@ -165,7 +166,7 @@ export function TravelPlanDetailPage() {
       try {
         const p = await getTravelPlan(planId, accessToken, shareHeaderToken);
         if (cancelled) return;
-        setPlan(p);
+        setPlan({ ...p, plannedBudget: roundMoney(p.plannedBudget) });
         try {
           const d = await listDestinations(planId, accessToken, shareHeaderToken);
           if (!cancelled) setDestinations(d);
@@ -188,7 +189,16 @@ export function TravelPlanDetailPage() {
           const e = await listExpenses(planId, accessToken, shareHeaderToken);
           if (!cancelled) setExpenses(e);
           const s = await getExpenseSummary(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setExpenseSummary(s);
+          if (!cancelled) {
+            setExpenseSummary({
+              ...s,
+              plannedBudget: roundMoney(s.plannedBudget),
+              totalExpenses: roundMoney(s.totalExpenses),
+              totalExpenseEntries: roundMoney(s.totalExpenseEntries),
+              totalActivityEstimatedCosts: roundMoney(s.totalActivityEstimatedCosts),
+              remainingBudget: roundMoney(s.remainingBudget),
+            });
+          }
         } catch (ee) {
           if (!cancelled) {
             setExpenses([]);
@@ -359,6 +369,9 @@ export function TravelPlanDetailPage() {
 
   if (!plan) return null;
 
+  const budgetSummary =
+    expenseSummary ?? buildSummary(roundMoney(plan.plannedBudget), expenses, activities);
+
   const activitiesByDate = activities.reduce<Record<string, TravelActivity[]>>((acc, item) => {
     if (!acc[item.activityDate]) acc[item.activityDate] = [];
     acc[item.activityDate].push(item);
@@ -412,9 +425,18 @@ export function TravelPlanDetailPage() {
 
   return (
     <div className="page plan-detail-page">
-      <Link to="/plans" className="back-link">
-        ← Svi planovi
+      <Link to={isAdmin ? '/admin/planovi' : '/plans'} className="back-link">
+        ← {isAdmin ? 'Admin planovi' : 'Svi planovi'}
       </Link>
+
+      {isAdmin ? (
+        <div className="card glass-panel admin-plan-banner">
+          <p className="muted" style={{ margin: 0 }}>
+            Pregledate plan kao <strong>administrator</strong>. Svaka izmena u bilo kojoj sekciji menija šalje vlasniku
+            detaljno obaveštenje.
+          </p>
+        </div>
+      ) : null}
 
       <header className="plan-detail-header">
         <div>
@@ -501,8 +523,22 @@ export function TravelPlanDetailPage() {
               </section>
               <section className="card plan-detail-panel accent">
                 <h2>Budžet</h2>
-                <p className="plan-detail-budget">{formatBudget(plan.plannedBudget)} EUR</p>
-                <p className="muted small">Planirani budžet putovanja.</p>
+                <div className="budget-osnovno-row">
+                  <div>
+                    <p className="muted small">Planirani budžet</p>
+                    <p className="plan-detail-budget">{formatMoneyEur(budgetSummary.plannedBudget)} EUR</p>
+                  </div>
+                  <div>
+                    <p className="muted small">Preostali budžet</p>
+                    <p className="plan-detail-budget plan-detail-budget-remaining">
+                      {formatMoneyEur(budgetSummary.remainingBudget)} EUR
+                    </p>
+                  </div>
+                </div>
+                <p className="muted small">
+                  Preostalo nakon troškova i procenjenih aktivnosti ({formatMoneyEur(budgetSummary.totalExpenses)} EUR
+                  potrošeno).
+                </p>
               </section>
 
               {showOwnerToolbar ? (
@@ -615,23 +651,23 @@ export function TravelPlanDetailPage() {
           <div className="expense-summary-grid">
             <div className="expense-summary-box">
               <p className="muted small">Planirani budžet</p>
-              <p className="expense-summary-value">{formatBudget(expenseSummary?.plannedBudget ?? plan.plannedBudget)} EUR</p>
+              <p className="expense-summary-value">{formatMoneyEur(budgetSummary.plannedBudget)} EUR</p>
             </div>
             <div className="expense-summary-box">
               <p className="muted small">Ukupno potrošeno</p>
-              <p className="expense-summary-value">{formatBudget(expenseSummary?.totalExpenses ?? 0)} EUR</p>
+              <p className="expense-summary-value">{formatMoneyEur(budgetSummary.totalExpenses)} EUR</p>
             </div>
             <div className="expense-summary-box">
               <p className="muted small">Troškovi (stavke)</p>
-              <p className="expense-summary-value">{formatBudget(expenseSummary?.totalExpenseEntries ?? 0)} EUR</p>
+              <p className="expense-summary-value">{formatMoneyEur(budgetSummary.totalExpenseEntries)} EUR</p>
             </div>
             <div className="expense-summary-box">
               <p className="muted small">Aktivnosti (procenjeno)</p>
-              <p className="expense-summary-value">{formatBudget(expenseSummary?.totalActivityEstimatedCosts ?? 0)} EUR</p>
+              <p className="expense-summary-value">{formatMoneyEur(budgetSummary.totalActivityEstimatedCosts)} EUR</p>
             </div>
             <div className="expense-summary-box">
               <p className="muted small">Preostali budžet</p>
-              <p className="expense-summary-value">{formatBudget(expenseSummary?.remainingBudget ?? plan.plannedBudget)} EUR</p>
+              <p className="expense-summary-value">{formatMoneyEur(budgetSummary.remainingBudget)} EUR</p>
             </div>
           </div>
           {expenses.length === 0 ? (
@@ -646,7 +682,7 @@ export function TravelPlanDetailPage() {
                       {categoryLabel(e.category)} · {formatShortDate(e.expenseDate)}
                     </p>
                     <p className="small">
-                      Iznos: <strong>{formatBudget(e.amount)} EUR</strong>
+                      Iznos: <strong>{formatMoneyEur(e.amount)} EUR</strong>
                     </p>
                     <p className="destination-notes small">{e.description ?? 'Bez opisa'}</p>
                   </div>
@@ -700,7 +736,7 @@ export function TravelPlanDetailPage() {
                           <p className="destination-location muted small">{a.location}</p>
                           <p className="destination-notes small">{a.description ?? 'Bez opisa'}</p>
                           <p className="small">
-                            Procenjeni trošak: <strong>{formatBudget(a.estimatedCost)}</strong> EUR
+                            Procenjeni trošak: <strong>{formatMoneyEur(a.estimatedCost)}</strong> EUR
                             {' · '}
                             <span className={statusClass(a.status)}>{formatStatus(a.status)}</span>
                           </p>
@@ -792,9 +828,19 @@ export function TravelPlanDetailPage() {
             <div className="calendar-popover" role="dialog" aria-modal="false" aria-label="Aktivnosti za izabrani datum">
               <div className="calendar-popover-header">
                 <p className="calendar-selected-title">Aktivnosti za {formatDate(selectedCalendarDate)}</p>
-                <button type="button" className="btn ghost btn-sm" onClick={() => setSelectedCalendarDate(null)}>
-                  Zatvori
-                </button>
+                <div className="calendar-popover-actions">
+                  {canMutateUi ? (
+                    <Link
+                      to={`/plans/${plan.id}/activities/new?date=${selectedCalendarDate}`}
+                      className="btn btn-glow primary btn-sm"
+                    >
+                      Nova aktivnost
+                    </Link>
+                  ) : null}
+                  <button type="button" className="btn ghost btn-sm" onClick={() => setSelectedCalendarDate(null)}>
+                    Zatvori
+                  </button>
+                </div>
               </div>
               {selectedDayActivities.length > 0 ? (
                 <ul className="calendar-popover-list">
@@ -809,20 +855,40 @@ export function TravelPlanDetailPage() {
                         <p className="destination-location muted small">{a.location}</p>
                         <p className="destination-notes small">{a.description ?? 'Bez opisa'}</p>
                         <p className="small">
-                          Procenjeni trošak: <strong>{formatBudget(a.estimatedCost)}</strong> EUR
+                          Procenjeni trošak: <strong>{formatMoneyEur(a.estimatedCost)}</strong> EUR
                           {' · '}
                           <span className={statusClass(a.status)}>{formatStatus(a.status)}</span>
                         </p>
                         {canMutateUi ? (
-                          <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
-                            Izmeni
-                          </Link>
+                          <div className="destination-item-actions">
+                            <Link to={`/plans/${plan.id}/activities/${a.id}/edit`} className="btn ghost btn-sm">
+                              Izmeni
+                            </Link>
+                            <button
+                              type="button"
+                              className="btn danger ghost btn-sm"
+                              disabled={deletingActId === a.id}
+                              onClick={() => void onDeleteActivity(a.id)}
+                            >
+                              {deletingActId === a.id ? 'Brišem…' : 'Obriši'}
+                            </button>
+                          </div>
                         ) : null}
                       </li>
                     ))}
                 </ul>
               ) : (
-                <p className="muted small">Nema aktivnosti za izabrani datum.</p>
+                <div className="calendar-popover-empty">
+                  <p className="muted small">Nema aktivnosti za izabrani datum.</p>
+                  {canMutateUi ? (
+                    <Link
+                      to={`/plans/${plan.id}/activities/new?date=${selectedCalendarDate}`}
+                      className="btn btn-glow primary btn-sm"
+                    >
+                      Dodaj aktivnost
+                    </Link>
+                  ) : null}
+                </div>
               )}
             </div>
           ) : null}

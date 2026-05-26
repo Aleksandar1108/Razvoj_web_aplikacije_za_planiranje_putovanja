@@ -14,6 +14,10 @@ import { TravelPlansListPage } from './pages/TravelPlansListPage';
 import { SharedPlansPage } from './pages/SharedPlansPage';
 import { ImportShareQrPage } from './pages/ImportShareQrPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminDestinationsPage } from './pages/AdminDestinationsPage';
+import { AdminDestinationFormPage } from './pages/AdminDestinationFormPage';
+import { AdminPlansPage } from './pages/AdminPlansPage';
+import { AdminPlanFormPage } from './pages/AdminPlanFormPage';
 
 export default function App() {
   return (
@@ -39,6 +43,14 @@ export default function App() {
             <Route path="/plans/:planId" element={<TravelPlanDetailPage />} />
             <Route element={<AdminRoute />}>
               <Route path="/admin/korisnici" element={<AdminUsersPage />} />
+              <Route path="/admin/planovi" element={<AdminPlansPage />} />
+              <Route path="/admin/planovi/new" element={<AdminPlanFormPage />} />
+              <Route path="/admin/destinacije" element={<AdminDestinationsPage />} />
+              <Route path="/admin/destinacije/new" element={<AdminDestinationFormPage />} />
+              <Route
+                path="/admin/destinacije/:planId/:destinationId/edit"
+                element={<AdminDestinationFormPage />}
+              />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

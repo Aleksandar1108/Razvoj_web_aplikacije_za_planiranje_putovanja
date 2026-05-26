@@ -1,4 +1,6 @@
 using System.Fabric;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +13,8 @@ using TravelPlansApi.Data;
 using TravelPlansApi.Infrastructure;
 using TravelPlansApi.Options;
 using TravelPlansApi.Services;
+using CrossService;
+using CrossService.Access;
 
 namespace TravelPlansApi;
 
@@ -53,8 +57,10 @@ internal sealed class TravelPlansApiService : StatelessService
                     if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
                         throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
 
+                    builder.Services.AddCrossServiceClients(builder.Configuration);
                     builder.Services.AddScoped<ITravelPlanAccessGuard, TravelPlanAccessGuard>();
                     builder.Services.AddScoped<ITravelPlanService, TravelPlanService>();
+                    builder.Services.AddScoped<IAdminPlanNotificationService, AdminPlanNotificationService>();
 
                     builder.Services.AddCors(options =>
                     {
@@ -78,7 +84,9 @@ internal sealed class TravelPlansApiService : StatelessService
                                 ValidIssuer = jwt.Issuer,
                                 ValidAudience = jwt.Audience,
                                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                                ClockSkew = TimeSpan.FromMinutes(1)
+                                ClockSkew = TimeSpan.FromMinutes(1),
+                                NameClaimType = JwtRegisteredClaimNames.Sub,
+                                RoleClaimType = ClaimTypes.Role
                             };
                         });
 

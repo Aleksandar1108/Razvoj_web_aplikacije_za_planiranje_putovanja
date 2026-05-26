@@ -1,23 +1,20 @@
-using Microsoft.EntityFrameworkCore;
+using CrossService.Clients;
 using DestinationsApi.Data;
 using DestinationsApi.Data.Entities;
 using DestinationsApi.Dtos;
+using Microsoft.EntityFrameworkCore;
 
 namespace DestinationsApi.Services;
 
 public sealed class DestinationService : IDestinationService
 {
     private readonly DestinationsDbContext _db;
+    private readonly ITravelPlansInternalClient _travelPlans;
 
-    public DestinationService(DestinationsDbContext db)
+    public DestinationService(DestinationsDbContext db, ITravelPlansInternalClient travelPlans)
     {
         _db = db;
-    }
-
-    public async Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        _travelPlans = travelPlans;
     }
 
     public async Task<IReadOnlyList<TravelDestinationResponseDto>> ListByTravelPlanIdAsync(
@@ -38,13 +35,8 @@ public sealed class DestinationService : IDestinationService
         Guid destinationId,
         CancellationToken cancellationToken)
     {
-        if (!await PlanExistsAsync(travelPlanId, cancellationToken))
-            return null;
-
         var row = await _db.TravelDestinations.AsNoTracking()
-            .FirstOrDefaultAsync(
-                d => d.Id == destinationId && d.TravelPlanId == travelPlanId,
-                cancellationToken);
+            .FirstOrDefaultAsync(d => d.Id == destinationId && d.TravelPlanId == travelPlanId, cancellationToken);
         return row is null ? null : Map(row);
     }
 
@@ -53,10 +45,8 @@ public sealed class DestinationService : IDestinationService
         CreateTravelDestinationRequestDto request,
         CancellationToken cancellationToken)
     {
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
-        if (plan is null)
-            throw new InvalidOperationException("Plan putovanja nije pronađen.");
+        var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken)
+                   ?? throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
         var arrival = request.ArrivalDate!.Value;
         var departure = request.DepartureDate!.Value;
@@ -87,8 +77,7 @@ public sealed class DestinationService : IDestinationService
         UpdateTravelDestinationRequestDto request,
         CancellationToken cancellationToken)
     {
-        var plan = await _db.TravelPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == travelPlanId, cancellationToken);
+        var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken);
         if (plan is null)
             return null;
 
@@ -130,13 +119,10 @@ public sealed class DestinationService : IDestinationService
         return true;
     }
 
-    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken)
-    {
-        return await _db.TravelPlans.AsNoTracking()
-            .AnyAsync(p => p.Id == travelPlanId, cancellationToken);
-    }
+    private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
+        await _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 
-    private static void ValidateAgainstPlan(DateOnly arrival, DateOnly departure, TravelPlanRowEntity plan)
+    private static void ValidateAgainstPlan(DateOnly arrival, DateOnly departure, CrossService.Dtos.TravelPlanMetaDto plan)
     {
         if (departure < arrival)
             throw new ArgumentException("Datum odlaska ne može biti pre datuma dolaska.");

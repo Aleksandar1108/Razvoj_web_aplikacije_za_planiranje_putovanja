@@ -1,11 +1,9 @@
-using ChecklistApi.Data.Entities;
 using ChecklistApi.Dtos;
 
 namespace ChecklistApi.Services;
 
 public interface IChecklistService
 {
-    Task<TravelPlanRowEntity?> GetPlanAsync(Guid travelPlanId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ChecklistItemResponseDto>> ListByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken);
     Task<ChecklistItemResponseDto?> GetAsync(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken);
     Task<ChecklistItemResponseDto> CreateAsync(Guid travelPlanId, CreateChecklistItemRequestDto request, CancellationToken cancellationToken);

@@ -60,11 +60,6 @@ export function SharedPlansPage() {
         <div className="plans-hero-copy">
           <p className="plans-kicker">Pristup preko QR / linka</p>
           <h1>Deljeni planovi</h1>
-          <p className="plans-lead">
-            Ovdje su planovi koji su <strong>povezani sa tvojim nalogom</strong> nakon što učitaš nečiji QR kod (claim).
-            Dozvola može biti <strong>pregled</strong> ili <strong>uređivanje</strong> — backend je provjerava na svakom
-            zahtjevu.
-          </p>
           <div className="plans-hero-actions">
             <Link to="/share/qr" className="btn btn-glow primary btn-lg">
               Učitaj QR

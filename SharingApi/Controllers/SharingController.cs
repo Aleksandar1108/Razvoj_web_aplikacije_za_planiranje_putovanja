@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -60,8 +61,21 @@ public sealed class SharingController : ControllerBase
         if (!TryGetUserId(out var userId))
             return Unauthorized();
 
-        var rows = await _sharing.ListSharedPlansForUserAsync(userId, cancellationToken);
-        return Ok(rows);
+        try
+        {
+            var rows = await _sharing.ListSharedPlansForUserAsync(userId, cancellationToken);
+            return Ok(rows);
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new
+                {
+                    message =
+                        "Podaci o planovima trenutno nisu dostupni. Proveri da li je pokrenut TravelPlansApi (port 8916) i SharingApi."
+                });
+        }
     }
 
     [Authorize]

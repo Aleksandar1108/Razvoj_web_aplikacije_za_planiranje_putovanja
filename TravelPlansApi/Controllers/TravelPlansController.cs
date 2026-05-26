@@ -2,8 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CrossService.Access;
 using TravelPlansApi.Dtos;
-using TravelPlansApi.Infrastructure;
 using TravelPlansApi.Services;
 
 namespace TravelPlansApi.Controllers;
@@ -14,11 +14,16 @@ public sealed class TravelPlansController : ControllerBase
 {
     private readonly ITravelPlanService _plans;
     private readonly ITravelPlanAccessGuard _access;
+    private readonly IAdminPlanNotificationService _adminNotifications;
 
-    public TravelPlansController(ITravelPlanService plans, ITravelPlanAccessGuard access)
+    public TravelPlansController(
+        ITravelPlanService plans,
+        ITravelPlanAccessGuard access,
+        IAdminPlanNotificationService adminNotifications)
     {
         _plans = plans;
         _access = access;
+        _adminNotifications = adminNotifications;
     }
 
     [Authorize]
@@ -88,10 +93,27 @@ public sealed class TravelPlansController : ControllerBase
         if (!TryGetUserId(out var userId))
             return Unauthorized();
 
+        var access = await _access.ResolveAsync(HttpContext, id, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
+            return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
+
+        var before = access.IsAdminOverride ? await _plans.GetByIdAsync(id, cancellationToken) : null;
+
         try
         {
-            var updated = await _plans.UpdateAsync(userId, id, request, cancellationToken);
-            return updated is null ? NotFound() : Ok(updated);
+            var updated = access.IsAdminOverride
+                ? await _plans.UpdateByPlanIdAsync(id, request, cancellationToken)
+                : await _plans.UpdateAsync(userId, id, request, cancellationToken);
+
+            if (updated is null)
+                return NotFound();
+
+            if (access.IsAdminOverride && before is not null)
+                await NotifyPlanUpdateAsync(before, updated, cancellationToken);
+
+            return Ok(updated);
         }
         catch (ArgumentException ex)
         {
@@ -107,14 +129,129 @@ public sealed class TravelPlansController : ControllerBase
     {
         if (!TryGetUserId(out var userId))
             return Unauthorized();
-        var ok = await _plans.DeleteAsync(userId, id, cancellationToken);
-        return ok ? NoContent() : NotFound();
+
+        var access = await _access.ResolveAsync(HttpContext, id, requiresMutation: true, cancellationToken);
+        if (!access.IsAllowed)
+            return Unauthorized();
+        if (!access.CanMutate)
+            return Forbid();
+
+        string? planName = null;
+        if (access.IsAdminOverride)
+        {
+            var before = await _plans.GetByIdAsync(id, cancellationToken);
+            planName = before?.Name;
+        }
+
+        var ok = access.IsAdminOverride
+            ? await _plans.DeleteByPlanIdAsync(id, cancellationToken)
+            : await _plans.DeleteAsync(userId, id, cancellationToken);
+
+        if (!ok)
+            return NotFound();
+
+        if (access.IsAdminOverride)
+        {
+            await TryNotifyAdminAsync(
+                access,
+                id,
+                AdminNotificationCategories.PlanBasic,
+                AdminMutationAction.Deleted,
+                planName,
+                null,
+                cancellationToken);
+        }
+
+        return NoContent();
+    }
+
+    private async Task NotifyPlanUpdateAsync(
+        TravelPlanResponseDto before,
+        TravelPlanResponseDto after,
+        CancellationToken cancellationToken)
+    {
+        var access = new TravelPlanAccessResolution(TravelPlanAccessKind.Admin);
+        var notesChanged = !string.Equals(
+            before.GeneralNotes?.Trim() ?? string.Empty,
+            after.GeneralNotes?.Trim() ?? string.Empty,
+            StringComparison.Ordinal);
+
+        var basicChanged =
+            before.Name != after.Name
+            || before.ShortDescription != after.ShortDescription
+            || before.StartDate != after.StartDate
+            || before.EndDate != after.EndDate
+            || before.PlannedBudget != after.PlannedBudget;
+
+        if (basicChanged)
+        {
+            await TryNotifyAdminAsync(
+                access,
+                after.Id,
+                AdminNotificationCategories.PlanBasic,
+                AdminMutationAction.Updated,
+                null,
+                null,
+                cancellationToken);
+        }
+
+        if (notesChanged)
+        {
+            await TryNotifyAdminAsync(
+                access,
+                after.Id,
+                AdminNotificationCategories.PlanNotes,
+                AdminMutationAction.Updated,
+                null,
+                null,
+                cancellationToken);
+        }
+    }
+
+    private async Task TryNotifyAdminAsync(
+        TravelPlanAccessResolution access,
+        Guid travelPlanId,
+        string category,
+        AdminMutationAction action,
+        string? itemLabel,
+        Guid? relatedId,
+        CancellationToken cancellationToken)
+    {
+        if (!access.IsAdminOverride)
+            return;
+
+        var adminId = ActingUserId();
+        if (adminId is null)
+            return;
+
+        await _adminNotifications.NotifyPlanOwnerAsync(
+            adminId.Value,
+            travelPlanId,
+            category,
+            action,
+            itemLabel,
+            relatedId,
+            null,
+            cancellationToken);
+    }
+
+    private Guid? ActingUserId()
+    {
+        var raw = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(raw, out var id) ? id : null;
     }
 
     private bool TryGetUserId(out Guid userId)
     {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return Guid.TryParse(raw, out userId);
+        var id = ActingUserId();
+        if (id is null)
+        {
+            userId = default;
+            return false;
+        }
+
+        userId = id.Value;
+        return true;
     }
 }

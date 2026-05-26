@@ -1,9 +1,13 @@
 using System.Fabric;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using ChecklistApi.Data;
 using ChecklistApi.Infrastructure;
 using ChecklistApi.Options;
 using ChecklistApi.Services;
+using CrossService;
+using CrossService.Access;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -53,8 +57,10 @@ internal sealed class ChecklistApiService : StatelessService
                     if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
                         throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
 
-                    builder.Services.AddScoped<ITravelPlanAccessGuard, TravelPlanAccessGuard>();
+                    builder.Services.AddCrossServiceClients(builder.Configuration);
+                    builder.Services.AddScoped<ITravelPlanAccessGuard, RemoteTravelPlanAccessGuard>();
                     builder.Services.AddScoped<IChecklistService, ChecklistService>();
+                    builder.Services.AddScoped<IAdminPlanNotificationService, AdminPlanNotificationService>();
 
                     builder.Services.AddCors(options =>
                     {
@@ -78,7 +84,9 @@ internal sealed class ChecklistApiService : StatelessService
                                 ValidIssuer = jwt.Issuer,
                                 ValidAudience = jwt.Audience,
                                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                                ClockSkew = TimeSpan.FromMinutes(1)
+                                ClockSkew = TimeSpan.FromMinutes(1),
+                                NameClaimType = JwtRegisteredClaimNames.Sub,
+                                RoleClaimType = ClaimTypes.Role
                             };
                         });
 
