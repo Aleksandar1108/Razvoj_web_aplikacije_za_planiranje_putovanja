@@ -1,3 +1,4 @@
+using CrossService.Clients;
 using Microsoft.EntityFrameworkCore;
 using TravelPlansApi.Data;
 using TravelPlansApi.Data.Entities;
@@ -8,10 +9,12 @@ namespace TravelPlansApi.Services;
 public sealed class TravelPlanService : ITravelPlanService
 {
     private readonly TravelPlansDbContext _db;
+    private readonly IPlanCascadeDeleteClient _cascadeDelete;
 
-    public TravelPlanService(TravelPlansDbContext db)
+    public TravelPlanService(TravelPlansDbContext db, IPlanCascadeDeleteClient cascadeDelete)
     {
         _db = db;
+        _cascadeDelete = cascadeDelete;
     }
 
     public async Task<IReadOnlyList<TravelPlanResponseDto>> ListForUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -99,6 +102,8 @@ public sealed class TravelPlanService : ITravelPlanService
         if (entity is null)
             return false;
 
+        await _cascadeDelete.DeleteAllRelatedDataAsync(planId, cancellationToken);
+
         _db.TravelPlans.Remove(entity);
         await _db.SaveChangesAsync(cancellationToken);
         return true;
@@ -109,6 +114,8 @@ public sealed class TravelPlanService : ITravelPlanService
         var entity = await _db.TravelPlans.FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
         if (entity is null)
             return false;
+
+        await _cascadeDelete.DeleteAllRelatedDataAsync(planId, cancellationToken);
 
         _db.TravelPlans.Remove(entity);
         await _db.SaveChangesAsync(cancellationToken);

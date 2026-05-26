@@ -18,6 +18,7 @@ public sealed class InternalTravelPlansController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet("{travelPlanId:guid}/meta")]
     public async Task<ActionResult<TravelPlanMetaDto>> Meta(Guid travelPlanId, CancellationToken cancellationToken)
     {

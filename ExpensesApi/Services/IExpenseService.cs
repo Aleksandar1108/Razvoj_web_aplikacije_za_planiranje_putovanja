@@ -10,4 +10,6 @@ public interface IExpenseService
     Task<TravelExpenseResponseDto?> UpdateAsync(Guid travelPlanId, Guid expenseId, UpdateTravelExpenseRequestDto request, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid travelPlanId, Guid expenseId, CancellationToken cancellationToken);
     Task<ExpenseSummaryDto?> GetSummaryAsync(Guid travelPlanId, CancellationToken cancellationToken);
+
+    Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken);
 }

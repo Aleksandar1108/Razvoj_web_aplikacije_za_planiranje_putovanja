@@ -108,6 +108,19 @@ public sealed class ChecklistService : IChecklistService
         return true;
     }
 
+    public async Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken)
+    {
+        var rows = await _db.ChecklistItems
+            .Where(x => x.TravelPlanId == travelPlanId)
+            .ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+            return 0;
+
+        _db.ChecklistItems.RemoveRange(rows);
+        await _db.SaveChangesAsync(cancellationToken);
+        return rows.Count;
+    }
+
     private Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
         _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 

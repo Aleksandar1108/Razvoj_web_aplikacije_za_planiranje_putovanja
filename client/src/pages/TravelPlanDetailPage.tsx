@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useAuth } from '../context/AuthContext';
 import { deleteTravelPlan, getTravelPlan } from '../services/travelPlansService';
@@ -109,8 +109,10 @@ function addDays(date: Date, days: number): Date {
 
 export function TravelPlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { accessToken, user } = useAuth();
+  const isPublicShareRoute = location.pathname.startsWith('/share/plans/');
   const isAdmin = user?.role === 'Admin';
   const [searchParams] = useSearchParams();
   const shareHeaderToken = useMemo(() => {
@@ -124,6 +126,11 @@ export function TravelPlanDetailPage() {
     if (raw === 'view' || raw === 'edit') return raw as SharePermission;
     return null;
   }, [searchParams]);
+
+  const isGuestShareView =
+    isPublicShareRoute || (!accessToken && Boolean(shareHeaderToken) && sharePermQuery === 'view');
+  const backHref = isGuestShareView ? '/share/view-qr' : isAdmin ? '/admin/planovi' : '/plans';
+  const backLabel = isGuestShareView ? '← Učitaj QR' : isAdmin ? '← Admin planovi' : '← Svi planovi';
 
   const [plan, setPlan] = useState<TravelPlan | null>(null);
   const [destinations, setDestinations] = useState<TravelDestination[]>([]);
@@ -155,6 +162,12 @@ export function TravelPlanDetailPage() {
 
   useEffect(() => {
     if (!planId) return;
+    if (isPublicShareRoute && (!shareHeaderToken || sharePermQuery !== 'view')) {
+      setLoading(false);
+      setError('Link za pregled nije validan. Učitaj QR kod ponovo.');
+      setPlan(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -176,18 +189,27 @@ export function TravelPlanDetailPage() {
             setDestError(de instanceof ApiError ? de.message : 'Destinacije nisu učitane.');
           }
         }
+        let loadedActivities: TravelActivity[] = [];
         try {
-          const a = await listActivities(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setActivities(a);
+          loadedActivities = await listActivities(planId, accessToken, shareHeaderToken);
+          if (!cancelled) setActivities(loadedActivities);
         } catch (ae) {
           if (!cancelled) {
             setActivities([]);
             setActError(ae instanceof ApiError ? ae.message : 'Aktivnosti nisu učitane.');
           }
         }
+        let loadedExpenses: TravelExpense[] = [];
         try {
-          const e = await listExpenses(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setExpenses(e);
+          loadedExpenses = await listExpenses(planId, accessToken, shareHeaderToken);
+          if (!cancelled) setExpenses(loadedExpenses);
+        } catch (ee) {
+          if (!cancelled) {
+            setExpenses([]);
+            setExpError(ee instanceof ApiError ? ee.message : 'Troškovi nisu učitani.');
+          }
+        }
+        try {
           const s = await getExpenseSummary(planId, accessToken, shareHeaderToken);
           if (!cancelled) {
             setExpenseSummary({
@@ -198,12 +220,17 @@ export function TravelPlanDetailPage() {
               totalActivityEstimatedCosts: roundMoney(s.totalActivityEstimatedCosts),
               remainingBudget: roundMoney(s.remainingBudget),
             });
+            setExpError(null);
           }
-        } catch (ee) {
-          if (!cancelled) {
-            setExpenses([]);
-            setExpenseSummary(null);
-            setExpError(ee instanceof ApiError ? ee.message : 'Troškovi nisu učitani.');
+        } catch (se) {
+          if (!cancelled && p) {
+            const plannedBudget = roundMoney(p.plannedBudget);
+            setExpenseSummary(buildSummary(plannedBudget, loadedExpenses, loadedActivities));
+            setExpError(
+              se instanceof ApiError && se.status >= 500
+                ? 'Sažetak budžeta trenutno nije dostupan; prikazan je lokalni proračun.'
+                : null
+            );
           }
         }
         try {
@@ -232,7 +259,7 @@ export function TravelPlanDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [planId, accessToken, shareHeaderToken]);
+  }, [planId, accessToken, shareHeaderToken, isPublicShareRoute, sharePermQuery]);
 
   async function onDelete() {
     if (!planId) return;
@@ -357,11 +384,18 @@ export function TravelPlanDetailPage() {
   if (error && !plan) {
     return (
       <div className="page plan-detail-page">
-        <Link to="/plans" className="back-link">
-          ← Svi planovi
+        <Link to={backHref} className="back-link">
+          {backLabel}
         </Link>
         <div className="card">
           <p className="error">{error}</p>
+          {isGuestShareView ? (
+            <p style={{ marginTop: 12 }}>
+              <Link to="/login" className="btn primary">
+                Prijavi se
+              </Link>
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -425,9 +459,18 @@ export function TravelPlanDetailPage() {
 
   return (
     <div className="page plan-detail-page">
-      <Link to={isAdmin ? '/admin/planovi' : '/plans'} className="back-link">
-        ← {isAdmin ? 'Admin planovi' : 'Svi planovi'}
+      <Link to={backHref} className="back-link">
+        {backLabel}
       </Link>
+
+      {isGuestShareView ? (
+        <div className="card glass-panel admin-plan-banner">
+          <p className="muted" style={{ margin: 0 }}>
+            Pregledate deljeni plan u <strong>režimu samo za čitanje</strong>. Za uređivanje se prijavite i učitajte QR
+            kod za uređivanje.
+          </p>
+        </div>
+      ) : null}
 
       {isAdmin ? (
         <div className="card glass-panel admin-plan-banner">
@@ -547,7 +590,8 @@ export function TravelPlanDetailPage() {
                     <h2>Deljenje (QR)</h2>
                   </div>
                   <p className="muted small">
-                    Izaberi nivo pristupa, generiši QR i preuzmi PNG. Drugi korisnik učitava QR u sekciji „Učitaj QR“.
+                    Izaberi nivo pristupa, generiši QR i preuzmi PNG. Za pregled bez naloga koristi „Učitaj QR“ na
+                    prijavi; za dodavanje na nalog — „Učitaj QR“ u meniju nakon prijave.
                   </p>
 
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>

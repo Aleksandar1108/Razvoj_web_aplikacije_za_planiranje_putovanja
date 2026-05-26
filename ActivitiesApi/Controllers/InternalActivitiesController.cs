@@ -18,6 +18,7 @@ public sealed class InternalActivitiesController : ControllerBase
         _db = db;
     }
 
+    [AllowAnonymous]
     [HttpGet("estimated-cost-sum")]
     public async Task<ActionResult<ActivityCostSumDto>> EstimatedCostSum(
         Guid travelPlanId,

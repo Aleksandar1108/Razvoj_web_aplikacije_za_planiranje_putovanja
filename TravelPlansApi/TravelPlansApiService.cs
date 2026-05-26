@@ -58,6 +58,7 @@ internal sealed class TravelPlansApiService : StatelessService
                         throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
 
                     builder.Services.AddCrossServiceClients(builder.Configuration);
+                    builder.Services.AddPlanCascadeDeleteClient();
                     builder.Services.AddScoped<ITravelPlanAccessGuard, TravelPlanAccessGuard>();
                     builder.Services.AddScoped<ITravelPlanService, TravelPlanService>();
                     builder.Services.AddScoped<IAdminPlanNotificationService, AdminPlanNotificationService>();

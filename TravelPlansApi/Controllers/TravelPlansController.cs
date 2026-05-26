@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -143,12 +144,21 @@ public sealed class TravelPlansController : ControllerBase
             planName = before?.Name;
         }
 
-        var ok = access.IsAdminOverride
-            ? await _plans.DeleteByPlanIdAsync(id, cancellationToken)
-            : await _plans.DeleteAsync(userId, id, cancellationToken);
+        try
+        {
+            var ok = access.IsAdminOverride
+                ? await _plans.DeleteByPlanIdAsync(id, cancellationToken)
+                : await _plans.DeleteAsync(userId, id, cancellationToken);
 
-        if (!ok)
-            return NotFound();
+            if (!ok)
+                return NotFound();
+        }
+        catch (HttpRequestException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Brisanje povezanih podataka nije uspelo. Plan nije obrisan.", detail = ex.Message });
+        }
 
         if (access.IsAdminOverride)
         {

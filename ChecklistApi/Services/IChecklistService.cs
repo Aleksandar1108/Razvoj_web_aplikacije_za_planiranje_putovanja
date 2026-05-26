@@ -10,4 +10,6 @@ public interface IChecklistService
     Task<ChecklistItemResponseDto?> UpdateAsync(Guid travelPlanId, Guid itemId, UpdateChecklistItemRequestDto request, CancellationToken cancellationToken);
     Task<ChecklistItemResponseDto?> ToggleAsync(Guid travelPlanId, Guid itemId, bool isDone, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid travelPlanId, Guid itemId, CancellationToken cancellationToken);
+
+    Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken);
 }

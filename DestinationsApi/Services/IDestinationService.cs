@@ -28,4 +28,6 @@ public interface IDestinationService
         Guid travelPlanId,
         Guid destinationId,
         CancellationToken cancellationToken);
+
+    Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken);
 }

@@ -13,6 +13,7 @@ import { TravelPlanFormPage } from './pages/TravelPlanFormPage';
 import { TravelPlansListPage } from './pages/TravelPlansListPage';
 import { SharedPlansPage } from './pages/SharedPlansPage';
 import { ImportShareQrPage } from './pages/ImportShareQrPage';
+import { ViewShareQrPage } from './pages/ViewShareQrPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminDestinationsPage } from './pages/AdminDestinationsPage';
 import { AdminDestinationFormPage } from './pages/AdminDestinationFormPage';
@@ -27,6 +28,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/share/view-qr" element={<ViewShareQrPage />} />
+          <Route path="/share/plans/:planId" element={<TravelPlanDetailPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/plans" element={<TravelPlansListPage />} />

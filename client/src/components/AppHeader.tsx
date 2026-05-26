@@ -13,6 +13,9 @@ export function AppHeader() {
       <nav className="nav">
         {!accessToken ? (
           <>
+            <NavLink to="/share/view-qr" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Učitaj QR
+            </NavLink>
             <NavLink to="/login" className={({ isActive }) => (isActive ? 'active' : '')}>
               Prijava
             </NavLink>

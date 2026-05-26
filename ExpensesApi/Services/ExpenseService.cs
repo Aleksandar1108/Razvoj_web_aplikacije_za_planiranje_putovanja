@@ -124,6 +124,19 @@ public sealed class ExpenseService : IExpenseService
         return true;
     }
 
+    public async Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken)
+    {
+        var rows = await _db.TravelExpenses
+            .Where(e => e.TravelPlanId == travelPlanId)
+            .ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+            return 0;
+
+        _db.TravelExpenses.RemoveRange(rows);
+        await _db.SaveChangesAsync(cancellationToken);
+        return rows.Count;
+    }
+
     public async Task<ExpenseSummaryDto?> GetSummaryAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
         var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken);

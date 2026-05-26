@@ -31,4 +31,11 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    public static IServiceCollection AddPlanCascadeDeleteClient(this IServiceCollection services)
+    {
+        services.AddHttpClient<IPlanCascadeDeleteClient, PlanCascadeDeleteClient>()
+            .AddHttpMessageHandler<ForwardAuthHandler>();
+        return services;
+    }
 }

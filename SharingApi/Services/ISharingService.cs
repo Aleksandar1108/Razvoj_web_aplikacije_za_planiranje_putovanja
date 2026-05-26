@@ -18,4 +18,6 @@ public interface ISharingService
     Task<IReadOnlyList<SharedTravelPlanListItemDto>> ListSharedPlansForUserAsync(
         Guid recipientUserId,
         CancellationToken cancellationToken);
+
+    Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken);
 }

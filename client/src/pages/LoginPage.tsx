@@ -70,6 +70,11 @@ export function LoginPage() {
       <p className="muted auth-footer">
         Nemaš nalog? <Link to="/register">Registruj se</Link>
       </p>
+      <p className="muted auth-footer" style={{ marginTop: 12 }}>
+        <Link to="/share/view-qr" className="btn ghost">
+          Učitaj QR
+        </Link>
+      </p>
       </div>
     </div>
   );

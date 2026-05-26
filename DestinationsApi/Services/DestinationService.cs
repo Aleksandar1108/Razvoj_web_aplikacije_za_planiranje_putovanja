@@ -119,6 +119,19 @@ public sealed class DestinationService : IDestinationService
         return true;
     }
 
+    public async Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken)
+    {
+        var rows = await _db.TravelDestinations
+            .Where(d => d.TravelPlanId == travelPlanId)
+            .ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+            return 0;
+
+        _db.TravelDestinations.RemoveRange(rows);
+        await _db.SaveChangesAsync(cancellationToken);
+        return rows.Count;
+    }
+
     private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
         await _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 

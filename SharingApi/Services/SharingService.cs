@@ -144,6 +144,27 @@ public sealed class SharingService : ISharingService
         }).ToList();
     }
 
+    public async Task<int> DeleteAllByTravelPlanIdAsync(Guid travelPlanId, CancellationToken cancellationToken)
+    {
+        var links = await _db.TravelPlanShareLinks
+            .Where(l => l.TravelPlanId == travelPlanId)
+            .ToListAsync(cancellationToken);
+        var recipients = await _db.TravelPlanShareRecipients
+            .Where(r => r.TravelPlanId == travelPlanId)
+            .ToListAsync(cancellationToken);
+
+        if (links.Count > 0)
+            _db.TravelPlanShareLinks.RemoveRange(links);
+        if (recipients.Count > 0)
+            _db.TravelPlanShareRecipients.RemoveRange(recipients);
+
+        if (links.Count == 0 && recipients.Count == 0)
+            return 0;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return links.Count + recipients.Count;
+    }
+
     private static string NormalizePermission(string permission)
     {
         var p = permission.Trim().ToLowerInvariant();
