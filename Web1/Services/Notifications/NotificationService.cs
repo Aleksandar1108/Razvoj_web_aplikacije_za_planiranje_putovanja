@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Web1.Data;
-using Web1.Dtos.Notifications;
+using ServiceContracts.Dtos;
 
 namespace Web1.Services.Notifications;
 

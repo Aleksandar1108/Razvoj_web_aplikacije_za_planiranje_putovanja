@@ -7,14 +7,16 @@ import type { TravelPlanUpsert } from '../models/travelPlan';
 import { adminService } from '../services/adminService';
 import { adminPlansService } from '../services/adminPlansService';
 import { ApiError } from '../services/httpClient';
+import { addDaysIso, defaultNewTripDates, todayIsoDate } from '../utils/dates';
 import { roundMoney } from '../utils/money';
 
 function emptyForm(): TravelPlanUpsert {
+  const { startDate, endDate } = defaultNewTripDates();
   return {
     name: '',
     shortDescription: '',
-    startDate: '',
-    endDate: '',
+    startDate,
+    endDate,
     plannedBudget: 0,
     generalNotes: '',
   };
@@ -184,8 +186,16 @@ export function AdminPlanFormPage() {
                 <input
                   type="date"
                   required
+                  min={todayIsoDate()}
                   value={form.startDate}
-                  onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                  onChange={(e) => {
+                    const startDate = e.target.value;
+                    setForm((f) => {
+                      const endDate =
+                        f.endDate && f.endDate >= startDate ? f.endDate : addDaysIso(startDate, 7);
+                      return { ...f, startDate, endDate };
+                    });
+                  }}
                 />
               </label>
               <label>
@@ -193,6 +203,7 @@ export function AdminPlanFormPage() {
                 <input
                   type="date"
                   required
+                  min={form.startDate || todayIsoDate()}
                   value={form.endDate}
                   onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
                 />

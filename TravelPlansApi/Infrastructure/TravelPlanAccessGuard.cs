@@ -1,9 +1,7 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using CrossService.Access;
 using CrossService.Clients;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
 using TravelPlansApi.Data;
 
 namespace TravelPlansApi.Infrastructure;
@@ -20,22 +18,21 @@ public sealed class TravelPlanAccessGuard : ITravelPlanAccessGuard
     }
 
     public async Task<TravelPlanAccessResolution> ResolveAsync(
-        HttpContext httpContext,
+        ServiceCallContext context,
         Guid travelPlanId,
         bool requiresMutation,
         CancellationToken cancellationToken)
     {
-        if (httpContext.Request.Headers.ContainsKey(ITravelPlanAccessGuard.ShareTokenHeaderName))
+        if (!string.IsNullOrWhiteSpace(context.ShareToken))
         {
-            var kind = await _sharing.ResolveShareTokenAccessAsync(travelPlanId, requiresMutation, cancellationToken);
+            var kind = await _sharing.ResolveShareTokenAccessAsync(context, travelPlanId, requiresMutation, cancellationToken);
             return MapKind(kind);
         }
 
-        if (!TryGetUserId(httpContext.User, out var userId))
+        if (context.UserId is not { } userId)
             return new TravelPlanAccessResolution(TravelPlanAccessKind.None);
 
-        if (httpContext.User.IsInRole("Admin")
-            && await _db.TravelPlans.AsNoTracking().AnyAsync(p => p.Id == travelPlanId, cancellationToken))
+        if (context.IsAdmin && await _db.TravelPlans.AsNoTracking().AnyAsync(p => p.Id == travelPlanId, cancellationToken))
             return new TravelPlanAccessResolution(TravelPlanAccessKind.Admin);
 
         var owned = await _db.TravelPlans.AsNoTracking()
@@ -44,22 +41,17 @@ public sealed class TravelPlanAccessGuard : ITravelPlanAccessGuard
         if (owned)
             return new TravelPlanAccessResolution(TravelPlanAccessKind.Owner);
 
-        var recipientKind = await _sharing.ResolveRecipientAccessAsync(travelPlanId, requiresMutation, cancellationToken);
+        var recipientKind = await _sharing.ResolveRecipientAccessAsync(context, travelPlanId, requiresMutation, cancellationToken);
         return MapKind(recipientKind);
     }
 
     private static TravelPlanAccessResolution MapKind(string kind) =>
         kind.Trim().ToLowerInvariant() switch
         {
+            "owner" => new TravelPlanAccessResolution(TravelPlanAccessKind.Owner),
             "shareview" => new TravelPlanAccessResolution(TravelPlanAccessKind.ShareView),
             "shareedit" => new TravelPlanAccessResolution(TravelPlanAccessKind.ShareEdit),
+            "admin" => new TravelPlanAccessResolution(TravelPlanAccessKind.Admin),
             _ => new TravelPlanAccessResolution(TravelPlanAccessKind.None)
         };
-
-    private static bool TryGetUserId(ClaimsPrincipal user, out Guid userId)
-    {
-        var raw = user.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? user.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return Guid.TryParse(raw, out userId);
-    }
 }

@@ -5,7 +5,7 @@ import type { CreateShareLinkResponse, SharedTravelPlanListItem, SharePermission
 function requireBase(): string {
   const b = getSharingApiBaseUrl();
   if (!b) {
-    throw new ApiError('Nije podešen VITE_SHARING_API_BASE_URL u .env fajlu.', 0);
+    throw new ApiError('Nije podešen VITE_API_BASE_URL u .env fajlu (ApiGateway).', 0);
   }
   return b;
 }

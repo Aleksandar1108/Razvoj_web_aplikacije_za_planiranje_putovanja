@@ -1,9 +1,9 @@
 using CrossService.Clients;
-using CrossService.Dtos;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
+using ServiceContracts.Dtos;
 using SharingApi.Data;
 using SharingApi.Data.Entities;
-using SharingApi.Dtos;
 using SharingApi.Infrastructure;
 
 namespace SharingApi.Services;
@@ -27,7 +27,10 @@ public sealed class SharingService : ISharingService
     {
         var permission = NormalizePermission(request.Permission);
 
-        var owner = await _travelPlans.GetOwnerAsync(travelPlanId, cancellationToken);
+        var owner = await _travelPlans.GetOwnerAsync(
+            ServiceCallContext.ForUser(ownerUserId),
+            travelPlanId,
+            cancellationToken);
         if (!owner.IsOwner || owner.OwnerUserId != ownerUserId)
             throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
@@ -125,7 +128,10 @@ public sealed class SharingService : ISharingService
             return Array.Empty<SharedTravelPlanListItemDto>();
 
         var planIds = recipients.Select(r => r.TravelPlanId).Distinct().ToList();
-        var plans = (await _travelPlans.GetMetaBatchAsync(planIds, cancellationToken))
+        var plans = (await _travelPlans.GetMetaBatchAsync(
+                ServiceCallContext.ForUser(recipientUserId),
+                planIds,
+                cancellationToken))
             .ToDictionary(p => p.Id);
 
         return recipients.Select(r =>
@@ -137,8 +143,8 @@ public sealed class SharingService : ISharingService
                 Permission = r.Permission,
                 Name = plan?.Name ?? "Plan",
                 ShortDescription = plan?.ShortDescription ?? string.Empty,
-                StartDate = plan?.StartDate ?? DateOnly.MinValue,
-                EndDate = plan?.EndDate ?? DateOnly.MinValue,
+                StartDate = plan?.StartDate ?? DateContract.FromDateOnly(DateOnly.MinValue),
+                EndDate = plan?.EndDate ?? DateContract.FromDateOnly(DateOnly.MinValue),
                 UpdatedAtUtc = r.UpdatedAtUtc
             };
         }).ToList();

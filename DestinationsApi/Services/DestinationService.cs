@@ -1,8 +1,9 @@
 using CrossService.Clients;
 using DestinationsApi.Data;
 using DestinationsApi.Data.Entities;
-using DestinationsApi.Dtos;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
+using ServiceContracts.Dtos;
 
 namespace DestinationsApi.Services;
 
@@ -48,8 +49,8 @@ public sealed class DestinationService : IDestinationService
         var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken)
                    ?? throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
-        var arrival = request.ArrivalDate!.Value;
-        var departure = request.DepartureDate!.Value;
+        var arrival = DateContract.RequireDateOnly(request.ArrivalDate);
+        var departure = DateContract.RequireDateOnly(request.DepartureDate);
         ValidateAgainstPlan(arrival, departure, plan);
 
         var now = DateTime.UtcNow;
@@ -86,8 +87,8 @@ public sealed class DestinationService : IDestinationService
         if (entity is null)
             return null;
 
-        var arrival = request.ArrivalDate!.Value;
-        var departure = request.DepartureDate!.Value;
+        var arrival = DateContract.RequireDateOnly(request.ArrivalDate);
+        var departure = DateContract.RequireDateOnly(request.DepartureDate);
         ValidateAgainstPlan(arrival, departure, plan);
 
         entity.Name = request.Name.Trim();
@@ -135,11 +136,11 @@ public sealed class DestinationService : IDestinationService
     private async Task<bool> PlanExistsAsync(Guid travelPlanId, CancellationToken cancellationToken) =>
         await _travelPlans.ExistsAsync(travelPlanId, cancellationToken);
 
-    private static void ValidateAgainstPlan(DateOnly arrival, DateOnly departure, CrossService.Dtos.TravelPlanMetaDto plan)
+    private static void ValidateAgainstPlan(DateOnly arrival, DateOnly departure, TravelPlanMetaDto plan)
     {
         if (departure < arrival)
             throw new ArgumentException("Datum odlaska ne može biti pre datuma dolaska.");
-        if (arrival < plan.StartDate || departure > plan.EndDate)
+        if (arrival < DateContract.ToDateOnly(plan.StartDate) || departure > DateContract.ToDateOnly(plan.EndDate))
             throw new ArgumentException("Datumi destinacije moraju biti u okviru datuma plana putovanja.");
     }
 
@@ -150,8 +151,8 @@ public sealed class DestinationService : IDestinationService
             TravelPlanId = e.TravelPlanId,
             Name = e.Name,
             Location = e.Location,
-            ArrivalDate = e.ArrivalDate,
-            DepartureDate = e.DepartureDate,
+            ArrivalDate = DateContract.FromDateOnly(e.ArrivalDate),
+            DepartureDate = DateContract.FromDateOnly(e.DepartureDate),
             Notes = e.Notes,
             CreatedAtUtc = e.CreatedAtUtc,
             UpdatedAtUtc = e.UpdatedAtUtc

@@ -1,147 +1,206 @@
 using System.Fabric;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using ActivitiesApi.Data;
-using ActivitiesApi.Infrastructure;
-using ActivitiesApi.Options;
 using ActivitiesApi.Services;
 using CrossService;
 using CrossService.Access;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using Microsoft.ServiceFabric.Services.Communication.AspNetCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
+using Microsoft.ServiceFabric.Services.Remoting.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
+using ServiceContracts;
+using ServiceContracts.Dtos;
+using ServiceContracts.Remoting;
 
 namespace ActivitiesApi;
 
-internal sealed class ActivitiesApiService : StatelessService
+internal sealed class ActivitiesApiService : StatelessService, IActivitiesRemotingService
 {
+    private readonly IServiceProvider _services;
+
     public ActivitiesApiService(StatelessServiceContext context)
         : base(context)
     {
+        _services = ServiceHostBootstrap.BuildProvider((services, configuration) =>
+        {
+            var connectionString = ServiceHostBootstrap.RequireConnectionString(configuration);
+
+            services.AddDbContext<ActivitiesDbContext>(options => options.UseSqlServer(connectionString));
+            services.AddCrossServiceRemoting();
+            services.AddScoped<IActivityService, ActivityService>();
+            services.AddScoped<IAdminPlanNotificationService, AdminPlanNotificationService>();
+        });
     }
 
-    protected override IEnumerable<ServiceInstanceListener> CreateServiceInstanceListeners()
+    protected override IEnumerable<ServiceInstanceListener> CreateServiceInstanceListeners() =>
+        this.CreateServiceRemotingInstanceListeners();
+
+    public Task<List<TravelActivityResponseDto>> ListActivitiesAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            await RequireAllowedAccess(sp, context, travelPlanId, requiresMutation: false, ct);
+            return (await sp.GetRequiredService<IActivityService>().ListByTravelPlanIdAsync(travelPlanId, ct)).ToList();
+        }, cancellationToken);
+
+    public Task<TravelActivityResponseDto> GetActivityAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        Guid activityId,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            await RequireAllowedAccess(sp, context, travelPlanId, requiresMutation: false, ct);
+            var dto = await sp.GetRequiredService<IActivityService>().GetAsync(travelPlanId, activityId, ct);
+            if (dto is null)
+                throw new ServiceOperationException(404, "Aktivnost nije pronađena.");
+            return dto;
+        }, cancellationToken);
+
+    public Task<TravelActivityResponseDto> CreateActivityAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        CreateTravelActivityRequestDto request,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var access = await RequireAllowedAccess(sp, context, travelPlanId, requiresMutation: true, ct);
+            RequireMutate(access);
+
+            try
+            {
+                var created = await sp.GetRequiredService<IActivityService>().CreateAsync(travelPlanId, request, ct);
+                await TryNotifyAsync(sp, access, context, travelPlanId, AdminMutationAction.Created, created.Name, created.Id, null, ct);
+                return created;
+            }
+            catch (InvalidOperationException)
+            {
+                throw new ServiceOperationException(404, "Plan putovanja nije pronađen.");
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ServiceOperationException(400, ex.Message);
+            }
+        }, cancellationToken);
+
+    public Task<TravelActivityResponseDto> UpdateActivityAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        Guid activityId,
+        UpdateTravelActivityRequestDto request,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var access = await RequireAllowedAccess(sp, context, travelPlanId, requiresMutation: true, ct);
+            RequireMutate(access);
+
+            try
+            {
+                var updated = await sp.GetRequiredService<IActivityService>()
+                    .UpdateAsync(travelPlanId, activityId, request, ct);
+                if (updated is null)
+                    throw new ServiceOperationException(404, "Aktivnost nije pronađena.");
+
+                await TryNotifyAsync(sp, access, context, travelPlanId, AdminMutationAction.Updated, updated.Name, updated.Id, null, ct);
+                return updated;
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ServiceOperationException(400, ex.Message);
+            }
+        }, cancellationToken);
+
+    public Task DeleteActivityAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        Guid activityId,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var access = await RequireAllowedAccess(sp, context, travelPlanId, requiresMutation: true, ct);
+            RequireMutate(access);
+
+            var activities = sp.GetRequiredService<IActivityService>();
+            string? name = null;
+            if (access.IsAdminOverride)
+            {
+                var existing = await activities.GetAsync(travelPlanId, activityId, ct);
+                name = existing?.Name;
+            }
+
+            var ok = await activities.DeleteAsync(travelPlanId, activityId, ct);
+            if (!ok)
+                throw new ServiceOperationException(404, "Aktivnost nije pronađena.");
+
+            await TryNotifyAsync(sp, access, context, travelPlanId, AdminMutationAction.Deleted, name ?? "aktivnost", activityId, null, ct);
+        }, cancellationToken);
+
+    public Task<ActivityCostSumDto> GetEstimatedCostSumAsync(
+        Guid travelPlanId,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var total = await sp.GetRequiredService<ActivitiesDbContext>().TravelActivities.AsNoTracking()
+                .Where(a => a.TravelPlanId == travelPlanId)
+                .SumAsync(a => (decimal?)a.EstimatedCost, ct) ?? 0m;
+
+            return new ActivityCostSumDto { TotalEstimatedCost = total };
+        }, cancellationToken);
+
+    public Task<CascadeDeleteResultDto> CascadeDeleteTravelPlanDataAsync(
+        Guid travelPlanId,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var deleted = await sp.GetRequiredService<IActivityService>()
+                .DeleteAllByTravelPlanIdAsync(travelPlanId, ct);
+            return new CascadeDeleteResultDto { Deleted = deleted };
+        }, cancellationToken);
+
+    private static async Task<TravelPlanAccessResolution> RequireAllowedAccess(
+        IServiceProvider sp,
+        ServiceCallContext context,
+        Guid travelPlanId,
+        bool requiresMutation,
+        CancellationToken cancellationToken)
     {
-        return
-        [
-            new ServiceInstanceListener(serviceContext =>
-                new KestrelCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
-                {
-                    ServiceEventSource.Current.ServiceMessage(serviceContext, $"ActivitiesApi Kestrel: {url}");
+        var access = await sp.GetRequiredService<ITravelPlanAccessGuard>()
+            .ResolveAsync(context, travelPlanId, requiresMutation, cancellationToken);
+        if (!access.IsAllowed)
+            throw new ServiceOperationException(401, "Nemate pristup ovom planu.");
+        return access;
+    }
 
-                    var builder = WebApplication.CreateBuilder();
+    private static void RequireMutate(TravelPlanAccessResolution access)
+    {
+        if (!access.CanMutate)
+            throw new ServiceOperationException(403, "Nemate dozvolu za izmenu.");
+    }
 
-                    builder.Services.AddSingleton<StatelessServiceContext>(serviceContext);
-                    builder.WebHost
-                        .UseKestrel()
-                        .UseContentRoot(Directory.GetCurrentDirectory())
-                        .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.None)
-                        .UseUrls(url);
+    private static async Task TryNotifyAsync(
+        IServiceProvider sp,
+        TravelPlanAccessResolution access,
+        ServiceCallContext context,
+        Guid travelPlanId,
+        AdminMutationAction action,
+        string itemLabel,
+        Guid? relatedId,
+        bool? checklistDone,
+        CancellationToken cancellationToken)
+    {
+        if (!access.IsAdminOverride || context.UserId is not { } adminId)
+            return;
 
-                    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")?.Trim();
-                    if (string.IsNullOrWhiteSpace(connectionString))
-                        throw new InvalidOperationException(
-                            "ConnectionStrings:DefaultConnection je prazan. Proveri ApplicationParameters (ActivitiesApi_DefaultConnection) ili appsettings.json.");
-
-                    builder.Services.AddDbContext<ActivitiesDbContext>(options =>
-                        options.UseSqlServer(connectionString));
-
-                    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
-                    var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-                        ?? throw new InvalidOperationException("Sekcija Jwt u konfiguraciji nedostaje.");
-                    if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
-                        throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
-
-                    builder.Services.AddCrossServiceClients(builder.Configuration);
-                    builder.Services.AddScoped<ITravelPlanAccessGuard, RemoteTravelPlanAccessGuard>();
-                    builder.Services.AddScoped<IActivityService, ActivityService>();
-                    builder.Services.AddScoped<IAdminPlanNotificationService, AdminPlanNotificationService>();
-
-                    builder.Services.AddCors(options =>
-                    {
-                        options.AddDefaultPolicy(policy =>
-                        {
-                            policy.AllowAnyHeader()
-                                .AllowAnyMethod()
-                                .SetIsOriginAllowed(_ => true);
-                        });
-                    });
-
-                    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                        .AddJwtBearer(options =>
-                        {
-                            options.TokenValidationParameters = new TokenValidationParameters
-                            {
-                                ValidateIssuer = true,
-                                ValidateAudience = true,
-                                ValidateLifetime = true,
-                                ValidateIssuerSigningKey = true,
-                                ValidIssuer = jwt.Issuer,
-                                ValidAudience = jwt.Audience,
-                                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                                ClockSkew = TimeSpan.FromMinutes(1),
-                                NameClaimType = JwtRegisteredClaimNames.Sub,
-                                RoleClaimType = ClaimTypes.Role
-                            };
-                        });
-
-                    builder.Services.AddAuthorization();
-
-                    builder.Services.AddControllers();
-                    builder.Services.AddEndpointsApiExplorer();
-                    builder.Services.AddSwaggerGen(c =>
-                    {
-                        c.SwaggerDoc("v1", new OpenApiInfo
-                        {
-                            Title = "Aktivnosti po danima (mikroservis)",
-                            Version = "v1",
-                            Description = "CRUD aktivnosti po planu putovanja; JWT izdaje Web1 /auth."
-                        });
-                        c.AddJwtBearerSecurity();
-                    });
-                    builder.Services.AddProblemDetails();
-
-                    var app = builder.Build();
-                    if (app.Environment.IsDevelopment())
-                        app.UseDeveloperExceptionPage();
-                    else
-                        app.UseExceptionHandler();
-
-                    app.UseCors();
-                    if (app.Environment.IsDevelopment())
-                    {
-                        app.UseSwagger();
-                        app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Activities API v1"));
-                    }
-
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.MapControllers();
-
-                    app.MapGet("/api/v1/health", () => Results.Ok(new { status = "ok", service = "ActivitiesApi" }));
-                    app.MapGet("/api/v1/health/db", async (ActivitiesDbContext db, CancellationToken ct) =>
-                    {
-                        try
-                        {
-                            await db.Database.OpenConnectionAsync(ct);
-                            await db.Database.CloseConnectionAsync();
-                            return Results.Ok(new { status = "ok", database = "connected" });
-                        }
-                        catch (Exception ex)
-                        {
-                            return Results.Json(
-                                new { status = "error", message = ex.Message },
-                                statusCode: StatusCodes.Status503ServiceUnavailable);
-                        }
-                    });
-
-                    return app;
-                }))
-        ];
+        await sp.GetRequiredService<IAdminPlanNotificationService>().NotifyPlanOwnerAsync(
+            adminId,
+            travelPlanId,
+            AdminNotificationCategories.Activity,
+            action,
+            itemLabel,
+            relatedId,
+            checklistDone,
+            cancellationToken);
     }
 }

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+using ServiceContracts;
 
 namespace CrossService.Access;
 
@@ -7,7 +7,7 @@ public interface ITravelPlanAccessGuard
     const string ShareTokenHeaderName = "X-Share-Token";
 
     Task<TravelPlanAccessResolution> ResolveAsync(
-        HttpContext httpContext,
+        ServiceCallContext context,
         Guid travelPlanId,
         bool requiresMutation,
         CancellationToken cancellationToken);

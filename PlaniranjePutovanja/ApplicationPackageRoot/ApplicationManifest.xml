@@ -1,6 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ApplicationManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ApplicationTypeName="PlaniranjePutovanjaType" ApplicationTypeVersion="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Parameters>
+    <Parameter Name="ApiGateway_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
+    <Parameter Name="NotificationDispatcher_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
     <Parameter Name="Web1_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
     <Parameter Name="Web1_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja_Web1;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=Web1-PlaniranjePutovanja" />
     <Parameter Name="TravelPlansApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
@@ -16,6 +18,20 @@
     <Parameter Name="SharingApi_ASPNETCORE_ENVIRONMENT" DefaultValue="" />
     <Parameter Name="SharingApi_DefaultConnection" DefaultValue="Data Source=localhost,1434;Initial Catalog=PlaniranjePutovanja_Sharing;User ID=sa;Password=Str0ng!Pass123;Integrated Security=False;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Application Name=SharingApi-PlaniranjePutovanja" />
   </Parameters>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="ApiGatewayPkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[ApiGateway_ASPNETCORE_ENVIRONMENT]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="NotificationDispatcherPkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+    <EnvironmentOverrides CodePackageRef="code">
+      <EnvironmentVariable Name="ASPNETCORE_ENVIRONMENT" Value="[NotificationDispatcher_ASPNETCORE_ENVIRONMENT]" />
+    </EnvironmentOverrides>
+  </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="Web1Pkg" ServiceManifestVersion="1.0.0" />
     <ConfigOverrides />

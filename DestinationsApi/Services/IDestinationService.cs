@@ -1,4 +1,4 @@
-using DestinationsApi.Dtos;
+using ServiceContracts.Dtos;
 
 namespace DestinationsApi.Services;
 

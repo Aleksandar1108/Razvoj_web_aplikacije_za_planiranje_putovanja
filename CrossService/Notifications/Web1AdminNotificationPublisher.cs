@@ -1,5 +1,5 @@
 using CrossService.Clients;
-using CrossService.Dtos;
+using ServiceContracts.Dtos;
 
 namespace CrossService.Notifications;
 
@@ -16,13 +16,13 @@ public interface IAdminNotificationPublisher
         CancellationToken cancellationToken = default);
 }
 
-public sealed class Web1AdminNotificationPublisher : IAdminNotificationPublisher
+public sealed class QueuedAdminNotificationPublisher : IAdminNotificationPublisher
 {
-    private readonly IWeb1InternalClient _web1;
+    private readonly INotificationDispatcherInternalClient _dispatcher;
 
-    public Web1AdminNotificationPublisher(IWeb1InternalClient web1)
+    public QueuedAdminNotificationPublisher(INotificationDispatcherInternalClient dispatcher)
     {
-        _web1 = web1;
+        _dispatcher = dispatcher;
     }
 
     public Task NotifyPlanOwnerAsync(
@@ -34,7 +34,7 @@ public sealed class Web1AdminNotificationPublisher : IAdminNotificationPublisher
         Guid? relatedEntityId = null,
         bool? checklistDone = null,
         CancellationToken cancellationToken = default) =>
-        _web1.CreateAdminNotificationAsync(
+        _dispatcher.EnqueueAdminNotificationAsync(
             new CreateAdminNotificationRequestDto
             {
                 OwnerUserId = ownerUserId,

@@ -1,4 +1,4 @@
-using ChecklistApi.Dtos;
+using ServiceContracts.Dtos;
 
 namespace ChecklistApi.Services;
 

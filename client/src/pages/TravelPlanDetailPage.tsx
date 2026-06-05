@@ -180,67 +180,73 @@ export function TravelPlanDetailPage() {
         const p = await getTravelPlan(planId, accessToken, shareHeaderToken);
         if (cancelled) return;
         setPlan({ ...p, plannedBudget: roundMoney(p.plannedBudget) });
-        try {
-          const d = await listDestinations(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setDestinations(d);
-        } catch (de) {
-          if (!cancelled) {
-            setDestinations([]);
-            setDestError(de instanceof ApiError ? de.message : 'Destinacije nisu učitane.');
-          }
-        }
+
+        const [destResult, actResult, expResult, summaryResult, checklistResult] = await Promise.allSettled([
+          listDestinations(planId, accessToken, shareHeaderToken),
+          listActivities(planId, accessToken, shareHeaderToken),
+          listExpenses(planId, accessToken, shareHeaderToken),
+          getExpenseSummary(planId, accessToken, shareHeaderToken),
+          listChecklistItems(planId, accessToken, shareHeaderToken),
+        ]);
+        if (cancelled) return;
+
         let loadedActivities: TravelActivity[] = [];
-        try {
-          loadedActivities = await listActivities(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setActivities(loadedActivities);
-        } catch (ae) {
-          if (!cancelled) {
-            setActivities([]);
-            setActError(ae instanceof ApiError ? ae.message : 'Aktivnosti nisu učitane.');
-          }
-        }
         let loadedExpenses: TravelExpense[] = [];
-        try {
-          loadedExpenses = await listExpenses(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setExpenses(loadedExpenses);
-        } catch (ee) {
-          if (!cancelled) {
-            setExpenses([]);
-            setExpError(ee instanceof ApiError ? ee.message : 'Troškovi nisu učitani.');
-          }
+
+        if (destResult.status === 'fulfilled') {
+          setDestinations(destResult.value);
+        } else {
+          setDestinations([]);
+          const de = destResult.reason;
+          setDestError(de instanceof ApiError ? de.message : 'Destinacije nisu učitane.');
         }
-        try {
-          const s = await getExpenseSummary(planId, accessToken, shareHeaderToken);
-          if (!cancelled) {
-            setExpenseSummary({
-              ...s,
-              plannedBudget: roundMoney(s.plannedBudget),
-              totalExpenses: roundMoney(s.totalExpenses),
-              totalExpenseEntries: roundMoney(s.totalExpenseEntries),
-              totalActivityEstimatedCosts: roundMoney(s.totalActivityEstimatedCosts),
-              remainingBudget: roundMoney(s.remainingBudget),
-            });
-            setExpError(null);
-          }
-        } catch (se) {
-          if (!cancelled && p) {
-            const plannedBudget = roundMoney(p.plannedBudget);
-            setExpenseSummary(buildSummary(plannedBudget, loadedExpenses, loadedActivities));
-            setExpError(
-              se instanceof ApiError && se.status >= 500
-                ? 'Sažetak budžeta trenutno nije dostupan; prikazan je lokalni proračun.'
-                : null
-            );
-          }
+
+        if (actResult.status === 'fulfilled') {
+          loadedActivities = actResult.value;
+          setActivities(loadedActivities);
+        } else {
+          setActivities([]);
+          const ae = actResult.reason;
+          setActError(ae instanceof ApiError ? ae.message : 'Aktivnosti nisu učitane.');
         }
-        try {
-          const items = await listChecklistItems(planId, accessToken, shareHeaderToken);
-          if (!cancelled) setChecklistItems(items);
-        } catch (ce) {
-          if (!cancelled) {
-            setChecklistItems([]);
-            setChecklistError(ce instanceof ApiError ? ce.message : 'Checklist nije učitan.');
-          }
+
+        if (expResult.status === 'fulfilled') {
+          loadedExpenses = expResult.value;
+          setExpenses(loadedExpenses);
+        } else {
+          setExpenses([]);
+          const ee = expResult.reason;
+          setExpError(ee instanceof ApiError ? ee.message : 'Troškovi nisu učitani.');
+        }
+
+        if (summaryResult.status === 'fulfilled') {
+          const s = summaryResult.value;
+          setExpenseSummary({
+            ...s,
+            plannedBudget: roundMoney(s.plannedBudget),
+            totalExpenses: roundMoney(s.totalExpenses),
+            totalExpenseEntries: roundMoney(s.totalExpenseEntries),
+            totalActivityEstimatedCosts: roundMoney(s.totalActivityEstimatedCosts),
+            remainingBudget: roundMoney(s.remainingBudget),
+          });
+          setExpError(null);
+        } else {
+          const plannedBudget = roundMoney(p.plannedBudget);
+          setExpenseSummary(buildSummary(plannedBudget, loadedExpenses, loadedActivities));
+          const se = summaryResult.reason;
+          setExpError(
+            se instanceof ApiError && se.status >= 500
+              ? 'Sažetak budžeta trenutno nije dostupan; prikazan je lokalni proračun.'
+              : null
+          );
+        }
+
+        if (checklistResult.status === 'fulfilled') {
+          setChecklistItems(checklistResult.value);
+        } else {
+          setChecklistItems([]);
+          const ce = checklistResult.reason;
+          setChecklistError(ce instanceof ApiError ? ce.message : 'Checklist nije učitan.');
         }
       } catch (e) {
         if (!cancelled) {
@@ -537,7 +543,7 @@ export function TravelPlanDetailPage() {
         </article>
         <article className="plan-overview-card card">
           <p className="muted small">Troškovi (stavke)</p>
-          <p className="overview-value">{expenses.length}</p>
+          <p className="overview-value">{formatMoneyEur(budgetSummary.totalExpenses)} EUR</p>
         </article>
         <article className="plan-overview-card card">
           <p className="muted small">Checklist</p>

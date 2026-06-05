@@ -1,0 +1,332 @@
+================================================================================
+DIJAGRAM ARHITEKTURE — PLANIRANJE PUTOVANJA
+Specifikacija za crtanje (stil kao referentni primer „kupovina knjiga“)
+Projekat: Razvoj_web_aplikacije_za_planiranje_putovanja
+================================================================================
+
+UPUTSTVO ZA CRTANJE (Claude / draw.io / PowerPoint / ručno)
+-------------------------------------------------------------
+Nacrtaj dijagram u istom DUHU kao referentna slika (knjige), ali prilagođen
+našem projektu:
+
+  • GORE:    korisnik + React frontend
+  • SREDINA: Service Fabric aplikacija „PlaniranjePutovanja“
+             — ApiGateway (stateless, ASP.NET Core + JWT) kao JEDINI javni HTTP ulaz
+             — STATEFUL i STATELESS mikroservisi (SF Remoting V2, bez Kestrel-a)
+  • DOLE:    SQL Server — 7 odvojenih baza (jedna po mikroservisu koji koristi DB)
+  • DESNO/Dole: legenda (boje linija + ikone)
+  • Numerisani tokovi (1–7) sa kratkim opisom
+  • Kutija „Važne napomene“
+
+Referentna slika ima STATEFUL servise (Reliable Dictionary, Reliable Queue).
+NAŠ PROJEKAT IMA 2 STATEFUL SERVISA — eksplicitno napisati na crtežu.
+
+
+================================================================================
+1. NASLOV DIJAGRAMA
+================================================================================
+
+Glavni naslov (veliki):
+  „ARHITEKTURA SISTEMA ZA PLANIRANJE PUTOVANJA“
+
+Podnaslov:
+  „Microsoft Service Fabric — API Gateway (HTTP) + Remoting V2 mikroservisi + React + SQL Server“
+
+Opciona traka ispod naslova:
+  „Napomena: React komunicira ISKLJUČIVO preko ApiGateway-a (:8900). Mikroservisi su interni.“
+
+
+================================================================================
+2. STATEFUL vs STATELESS — ŠTA CRTATI I ZAŠTO
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ API GATEWAY (Stateless, ASP.NET Core + JWT) — JAVNI ULAZ                    │
+│                                                                             │
+│  ApiGateway (:8900)                                                         │
+│  • Jedini servis sa ASP.NET Core koji React direktno poziva                 │
+│  • HTTP kontroleri mapiraju /api/v1/* na SF Remoting V2 proxy pozive        │
+│  • JWT validacija i CORS samo na gateway-u                                  │
+│  • Gradi ServiceCallContext (UserId, Role, ShareToken) za remoting          │
+│                                                                             │
+│  Zašto ASP.NET Core ovde: front treba HTTP REST ulaz; gateway je taj sloj.  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STATEFUL SERVISI:  2 (zelena zona — Reliable State)                         │
+│                                                                             │
+│  1. SharingApi (:8922)                                                      │
+│     • Reliable Dictionary: ShareAccessCache                                   │
+│     • Zašto stateful: svaki gostinski pregled plana (X-Share-Token) prolazi   │
+│       kroz validaciju pristupa — keš u repliciranom dictionary-ju smanjuje    │
+│       opterećenje SQL-a i drži session-like stanje aktivnih tokena          │
+│     • SQL i dalje čuva trajne share linkove i primaoce                      │
+│                                                                             │
+│  2. NotificationDispatcher (:8923)                                          │
+│     • Reliable Queue: AdminNotificationQueue                                │
+│     • Zašto stateful: admin izmene šalju obaveštenja vlasniku plana —       │
+│       asinhrona obrada preko reda (kao EventDispatcher u primeru knjiga)    │
+│     • Worker iz queue-a poziva Web1 preko SF Remoting za upis u bazu        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STATELESS SERVISI:  6 (plava zona)                                          │
+│                                                                             │
+│  1. Web1              (:8915) — auth (JWT), admin korisnici, obaveštenja DB  │
+│     Zašto stateless: JWT je sam po sebi stateless; korisnici u SQL            │
+│                                                                             │
+│  2. TravelPlansApi    (:8916) — planovi putovanja, kaskadno brisanje         │
+│     Zašto stateless: CRUD + orkestracija; nema potrebe za in-memory stanjem   │
+│                                                                             │
+│  3. DestinationsApi   (:8917) — destinacije po planu                           │
+│  4. ActivitiesApi     (:8919) — aktivnosti po danima                        │
+│  5. ExpensesApi       (:8920) — troškovi i sažetak budžeta                  │
+│  6. ChecklistApi      (:8921) — checklist / packing lista                   │
+│     Zašto stateless (3–6): čist CRUD nad SQL; svaki zahtev je nezavisan      │
+│                                                                             │
+│  Ovi servisi koriste SF Remoting V2 listener (bez Kestrel-a, bez HTTP).     │
+│  React ih ne zove direktno — samo ApiGateway poziva remoting interfejse.    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+NIJE mikroservis (ne crtati kao kutiju u SF):
+  • ServiceContracts — DTO-ovi i remoting interfejsi (IWeb1RemotingService, …)
+  • CrossService — remoting proxy klijenti, access guard, DI bootstrap
+  • React client — frontend (izvan SF paketa)
+
+
+================================================================================
+3. LEGENDA (donji desni ugao — obavezno)
+================================================================================
+
+TIPOVI LINIJA:
+
+  [PLAVA PUNA LINIJA]
+      HTTP / REST — React → ApiGateway → mikroservis (javni API)
+      Primer: POST /api/v1/auth/login → Gateway → Web1
+
+  [TAMNO PLAVA PUNA LINIJA]  (opciono, istaknuto)
+      React → ApiGateway (:8900) — JEDINA direktna veza frontenda sa backendom
+
+  [ZELENA PUNA LINIJA]
+      Sinhroni pristup bazi — mikroservis → svoj SQL Server (EF Core)
+
+  [LJUBIČASTA ISPREKIDANA LINIJA]
+      SF Remoting V2 interni pozivi (servis → servis, BEZ gateway-a)
+      URI: fabric:/PlaniranjePutovanja/{ServiceName}
+      Primer: TravelPlansApi → PlanCascadeDeleteClient → 6 servisa cascade
+      Primer: DestinationsApi → INotificationDispatcherRemotingService.Enqueue
+      Primer: NotificationDispatcher worker → IWeb1RemotingService.CreateAdminNotification
+      Napomena: ServiceCallContext nosi UserId, Role, ShareToken
+
+  [ZELENA ISPREKIDANA] — Reliable Dictionary (SharingApi keš tokena)
+  [NARANDŽASTA ISPREKIDANA] — Reliable Queue (NotificationDispatcher)
+
+IKONE:
+  [monitor / browser]     React frontend (Vite + TypeScript)
+  [narandžasti/plavi]     ApiGateway (ASP.NET Core + JWT) — jedini javni HTTP API
+  [plavi pravougaonik]    Stateless Service Fabric servis
+  [zeleni pravougaonik]   Stateful Service Fabric servis (Reliable Dictionary/Queue)
+  [cilindar SQL]          SQL Server baza podataka
+  [silueta korisnika]     Krajnji korisnik (User) ili Administrator (Admin)
+
+
+================================================================================
+4. GORNJI SLOJ — KORISNIK I FRONTEND
+================================================================================
+
+[Silueta: Korisnik / Admin]
+      │
+      ▼
+[React Frontend — Vite + TypeScript]
+  Folder: client/
+
+  Konfiguracija: SAMO jedan URL
+    VITE_API_BASE_URL → ApiGateway :8900
+
+  Autentikacija na klijentu:
+    • JWT u localStorage
+    • Header: Authorization: Bearer <token>
+    • Za deljeni pregled (gost): X-Share-Token + query ?t= & ?p=view
+
+  VAŽNO ZA CRTAŽ:
+    React NE zove mikroservise direktno.
+    SVE ide: React → ApiGateway (HTTP) → SF Remoting V2 → odgovarajući mikroservis.
+
+  HTTP pozivi kroz servisni sloj (authService, travelPlansService, …),
+  svi koriste isti getApiBaseUrl() iz client/src/config/env.ts.
+
+
+================================================================================
+5. SREDNJI SLOJ — SERVICE FABRIC APLIKACIJA
+================================================================================
+
+Veliki okvir: „PlaniranjePutovanja“ (ApplicationTypeName: PlaniranjePutovanjaType)
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  API GATEWAY — Stateless ASP.NET Core + JWT (:8900)                       │
+  │  Jedini javni HTTP ulaz; poziva remoting proxy za svaki /api/v1/* endpoint │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+
+  ZONA STATELESS (plava):
+    Web1 | TravelPlansApi | DestinationsApi | ActivitiesApi | ExpensesApi | ChecklistApi
+
+  ZONA STATEFUL (zelena):
+    SharingApi (Reliable Dictionary) | NotificationDispatcher (Reliable Queue)
+
+Raspored kutija (predlog):
+
+  RED 0 (gateway):
+    ┌──────────────────┐
+    │   ApiGateway     │  :8900  — HTTP + JWT, jedini javni port
+    └──────────────────┘
+
+  RED 1 (platforma + jezgro):
+    ┌──────────────┐  ┌──────────────────┐  ┌────────────────────────┐
+    │    Web1      │  │  TravelPlansApi  │  │ NotificationDispatcher │
+    │   :8915      │  │     :8916        │  │   :8923  [STATEFUL]    │
+    │ Auth, Admin  │  │ Planovi, cascade │  │ Reliable Queue         │
+    └──────────────┘  └──────────────────┘  └────────────────────────┘
+
+  RED 2 (sadržaj + deljenje):
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │DestinationsApi│ │ ActivitiesApi│  │ ExpensesApi  │  │ ChecklistApi │
+    │    :8917     │  │    :8919     │  │    :8920     │  │    :8921     │
+    └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+
+    ┌──────────────────────────┐
+    │      SharingApi          │  :8922  [STATEFUL — Reliable Dictionary]
+    │  QR, share tokeni, keš  │
+    └──────────────────────────┘
+
+
+================================================================================
+6. DONJI SLOJ — SQL SERVER (7 BAZA)
+================================================================================
+
+NotificationDispatcher i ApiGateway NEMAJU svoju SQL bazu.
+
+  Web1              →  PlaniranjePutovanja_Web1
+  TravelPlansApi    →  PlaniranjePutovanja_TravelPlans
+  DestinationsApi   →  PlaniranjePutovanja_Destinations
+  ActivitiesApi     →  PlaniranjePutovanja_Activities
+  ExpensesApi       →  PlaniranjePutovanja_Expenses
+  ChecklistApi      →  PlaniranjePutovanja_Checklist
+  SharingApi        →  PlaniranjePutovanja_Sharing
+
+
+================================================================================
+7. API GATEWAY → REMOTING MAPIRANJE
+================================================================================
+
+  Gateway HTTP kontroleri → ServiceFabricRemoting.CreateProxy<T>():
+
+  /api/v1/auth/*, /api/v1/admin/*, /api/v1/notifications/*     → IWeb1RemotingService
+  /api/v1/travel-plans/* (osnovni CRUD)                         → ITravelPlansRemotingService
+  /api/v1/admin/travel-plans/*                                  → ITravelPlansRemotingService
+  /api/v1/travel-plans/{id}/destinations/*                      → IDestinationsRemotingService
+  /api/v1/admin/destinations/*                                  → IDestinationsRemotingService
+  /api/v1/travel-plans/{id}/activities/*                        → IActivitiesRemotingService
+  /api/v1/travel-plans/{id}/expenses/*                          → IExpensesRemotingService
+  /api/v1/travel-plans/{id}/checklist-items/*                   → IChecklistRemotingService
+  /api/v1/travel-plans/{id}/share-links, /api/v1/share-links/*,
+  /api/v1/shared-plans/*                                        → ISharingRemotingService
+
+  Interni remoting pozivi (bez HTTP): cascade delete, meta-batch, access resolve,
+  notification enqueue — direktno između servisa preko CrossService proxy klijenata.
+
+
+================================================================================
+8. NUMERISANI TOKOVI
+================================================================================
+
+  [1] PRIJAVA
+      Korisnik → React → ApiGateway → Web1 POST /auth/login → Web1_DB → JWT
+
+  [2] PREGLED PLANA
+      Korisnik → React → ApiGateway → TravelPlansApi (+ paralelno destinacije,
+      aktivnosti, troškovi, checklist — svi kroz gateway)
+
+  [3] DELJENJE QR
+      Vlasnik → React → ApiGateway → SharingApi → Sharing_DB
+
+  [4] PREGLED PREKO QR (gost)
+      Gost → React → ApiGateway → mikroservisi sa X-Share-Token
+      SharingApi proverava token (Reliable Dictionary keš + SQL)
+
+  [5] CLAIM QR
+      Korisnik → React → ApiGateway → SharingApi POST claim → Sharing_DB
+
+  [6] BRISANJE PLANA (kaskadno)
+      Korisnik → ApiGateway → TravelPlansApi DELETE
+      TravelPlansApi → [paralelno interni HTTP] cascade na svim servisima
+      → tek onda DELETE plana u TravelPlans_DB
+
+  [7] ADMIN OBAVEŠTENJE (asinhrono)
+      Admin → ApiGateway → npr. DestinationsApi PUT
+      DestinationsApi → NotificationDispatcher enqueue (Reliable Queue)
+      NotificationDispatcher worker → Web1 interni POST → Web1_DB
+
+
+================================================================================
+9. RAZLIKA U ODNOSU NA REFERENTNI PRIMER (knjige)
+================================================================================
+
+  Aspekt                    | Primer (knjige)          | Naš projekat
+  --------------------------|--------------------------|----------------------------
+  API Gateway               | BackendSF                | ApiGateway (YARP) :8900
+  Stateful servisi          | Bank, Library, EventDisp | SharingApi, NotificationDisp
+  Reliable Dictionary       | Da                       | Da (SharingApi keš tokena)
+  Reliable Queue            | Da (email)               | Da (admin obaveštenja)
+  React → backend           | Jedan ulaz               | Jedan ulaz (ApiGateway)
+  Mikroservisi → front      | Ne direktno              | Ne direktno
+  Baza podataka             | 2 DB                     | 7 DB (1 po servisu sa SQL)
+  Orkestrator               | Validator                | TravelPlansApi (cascade)
+
+
+================================================================================
+10. KUTIJA „VAŽNE NAPOMENE“
+================================================================================
+
+  • React komunicira ISKLJUČIVO preko ApiGateway-a — ne direktno sa mikroservisima.
+  • ASP.NET Core na gateway-u je javni HTTP sloj; mikroservisi su interni.
+  • 2 STATEFUL servisa: SharingApi (Dictionary), NotificationDispatcher (Queue).
+  • 6 STATELESS servisa: Web1, TravelPlansApi, Destinations, Activities, Expenses, Checklist.
+  • Međuservisna komunikacija: direktan HTTP (interni endpointi), ne kroz gateway.
+  • JWT + uloga (User/Admin); deljeni planovi: X-Share-Token.
+  • CrossService je deljena biblioteka, nije deploy-ovani servis.
+
+
+================================================================================
+11. PREDLOG RASPOREDA (ASCII sketch)
+================================================================================
+
+    [Korisnik]     [Admin]
+         \            /
+          \          /
+           [ React Frontend ]
+                  |
+                  |  (samo jedna strelica!)
+                  ▼
+           [ ApiGateway :8900 ]
+                  |
+    .─────────────┼─────────────────────────────.
+    |  SERVICE FABRIC: PlaniranjePutovanja       |
+    |  ┌──────────────────────────────────────┐  |
+    |  │ STATELESS: Web1, TravelPlans, ...  │  |
+    |  │ STATEFUL:  SharingApi, NotifDisp.  │  |
+    |  └──────────────────────────────────────┘  |
+    '──────────────────────────────────────────'
+         |    |    |    |    |    |    |
+         ▼    ▼    ▼    ▼    ▼    ▼    ▼
+       [7 x SQL cilindri — servisi sa DB]
+
+  Legenda: donji desni ugao
+  Tokovi 1–7: numerisane strelice
+
+
+================================================================================
+KRAJ SPECIFIKACIJE
+================================================================================

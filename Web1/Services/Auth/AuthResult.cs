@@ -1,4 +1,4 @@
-using Web1.Dtos.Auth;
+using ServiceContracts.Dtos;
 
 namespace Web1.Services.Auth;
 

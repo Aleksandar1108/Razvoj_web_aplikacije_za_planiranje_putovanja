@@ -1,41 +1,29 @@
 using CrossService.Access;
 using CrossService.Clients;
-using CrossService.Http;
 using CrossService.Notifications;
-using CrossService.Options;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CrossService;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddCrossServiceClients(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddCrossServiceRemoting(this IServiceCollection services)
     {
-        services.Configure<MicroserviceUrlsOptions>(configuration.GetSection(MicroserviceUrlsOptions.SectionName));
-        services.AddHttpContextAccessor();
+        services.AddSingleton<ITravelPlansInternalClient, TravelPlansInternalClient>();
+        services.AddSingleton<ISharingInternalClient, SharingInternalClient>();
+        services.AddSingleton<IWeb1InternalClient, Web1InternalClient>();
+        services.AddSingleton<IActivitiesInternalClient, ActivitiesInternalClient>();
+        services.AddSingleton<INotificationDispatcherInternalClient, NotificationDispatcherInternalClient>();
 
-        services.AddTransient<ForwardAuthHandler>();
-
-        services.AddHttpClient<ITravelPlansInternalClient, TravelPlansInternalClient>()
-            .AddHttpMessageHandler<ForwardAuthHandler>();
-        services.AddHttpClient<ISharingInternalClient, SharingInternalClient>()
-            .AddHttpMessageHandler<ForwardAuthHandler>();
-        services.AddHttpClient<IWeb1InternalClient, Web1InternalClient>()
-            .AddHttpMessageHandler<ForwardAuthHandler>();
-        services.AddHttpClient<IActivitiesInternalClient, ActivitiesInternalClient>()
-            .AddHttpMessageHandler<ForwardAuthHandler>();
-
-        services.AddScoped<ITravelPlanAccessGuard, RemoteTravelPlanAccessGuard>();
-        services.AddScoped<IAdminNotificationPublisher, Web1AdminNotificationPublisher>();
+        services.AddScoped<ITravelPlanAccessGuard, RemotingTravelPlanAccessGuard>();
+        services.AddScoped<IAdminNotificationPublisher, QueuedAdminNotificationPublisher>();
 
         return services;
     }
 
     public static IServiceCollection AddPlanCascadeDeleteClient(this IServiceCollection services)
     {
-        services.AddHttpClient<IPlanCascadeDeleteClient, PlanCascadeDeleteClient>()
-            .AddHttpMessageHandler<ForwardAuthHandler>();
+        services.AddSingleton<IPlanCascadeDeleteClient, PlanCascadeDeleteClient>();
         return services;
     }
 }

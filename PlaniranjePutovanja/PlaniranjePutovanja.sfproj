@@ -36,27 +36,19 @@
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Web1\Web1.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
+    <ProjectReference Include="..\ApiGateway\ApiGateway.csproj">
+      <ServiceLaunchUrl>http://localhost:{ServicePort}/api/v1/health</ServiceLaunchUrl>
     </ProjectReference>
-    <ProjectReference Include="..\TravelPlansApi\TravelPlansApi.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
+    <ProjectReference Include="..\NotificationDispatcher\NotificationDispatcher.csproj">
+      <ServiceLaunchUrl>http://localhost:{ServicePort}/api/v1/health</ServiceLaunchUrl>
     </ProjectReference>
-    <ProjectReference Include="..\DestinationsApi\DestinationsApi.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
-    </ProjectReference>
-    <ProjectReference Include="..\ActivitiesApi\ActivitiesApi.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
-    </ProjectReference>
-    <ProjectReference Include="..\ExpensesApi\ExpensesApi.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
-    </ProjectReference>
-    <ProjectReference Include="..\ChecklistApi\ChecklistApi.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
-    </ProjectReference>
-    <ProjectReference Include="..\SharingApi\SharingApi.csproj">
-      <ServiceLaunchUrl>http://localhost:{ServicePort}/swagger</ServiceLaunchUrl>
-    </ProjectReference>
+    <ProjectReference Include="..\Web1\Web1.csproj" />
+    <ProjectReference Include="..\TravelPlansApi\TravelPlansApi.csproj" />
+    <ProjectReference Include="..\DestinationsApi\DestinationsApi.csproj" />
+    <ProjectReference Include="..\ActivitiesApi\ActivitiesApi.csproj" />
+    <ProjectReference Include="..\ExpensesApi\ExpensesApi.csproj" />
+    <ProjectReference Include="..\ChecklistApi\ChecklistApi.csproj" />
+    <ProjectReference Include="..\SharingApi\SharingApi.csproj" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
   <PropertyGroup>

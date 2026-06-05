@@ -1,8 +1,9 @@
 using CrossService.Clients;
 using ExpensesApi.Data;
 using ExpensesApi.Data.Entities;
-using ExpensesApi.Dtos;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
+using ServiceContracts.Dtos;
 
 namespace ExpensesApi.Services;
 
@@ -67,7 +68,7 @@ public sealed class ExpenseService : IExpenseService
             Name = request.Name.Trim(),
             Category = category,
             Amount = request.Amount,
-            ExpenseDate = request.ExpenseDate!.Value,
+            ExpenseDate = DateContract.RequireDateOnly(request.ExpenseDate),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -98,7 +99,7 @@ public sealed class ExpenseService : IExpenseService
         entity.Name = request.Name.Trim();
         entity.Category = category;
         entity.Amount = request.Amount;
-        entity.ExpenseDate = request.ExpenseDate!.Value;
+        entity.ExpenseDate = DateContract.RequireDateOnly(request.ExpenseDate);
         entity.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         entity.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -184,7 +185,7 @@ public sealed class ExpenseService : IExpenseService
             Name = e.Name,
             Category = e.Category,
             Amount = e.Amount,
-            ExpenseDate = e.ExpenseDate,
+            ExpenseDate = DateContract.FromDateOnly(e.ExpenseDate),
             Description = e.Description,
             CreatedAtUtc = e.CreatedAtUtc,
             UpdatedAtUtc = e.UpdatedAtUtc

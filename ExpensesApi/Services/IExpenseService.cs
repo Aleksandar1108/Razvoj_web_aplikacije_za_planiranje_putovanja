@@ -1,4 +1,4 @@
-using ExpensesApi.Dtos;
+using ServiceContracts.Dtos;
 
 namespace ExpensesApi.Services;
 

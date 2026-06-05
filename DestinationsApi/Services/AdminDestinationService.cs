@@ -1,8 +1,8 @@
 using CrossService.Clients;
-using CrossService.Dtos;
 using DestinationsApi.Data;
-using DestinationsApi.Dtos;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
+using ServiceContracts.Dtos;
 
 namespace DestinationsApi.Services;
 
@@ -23,6 +23,7 @@ public sealed class AdminDestinationService : IAdminDestinationService
     }
 
     public async Task<IReadOnlyList<AdminDestinationListItemDto>> ListAllAsync(
+        ServiceCallContext context,
         CancellationToken cancellationToken = default)
     {
         var destinations = await _db.TravelDestinations.AsNoTracking()
@@ -31,7 +32,7 @@ public sealed class AdminDestinationService : IAdminDestinationService
             .ToListAsync(cancellationToken);
 
         var planIds = destinations.Select(d => d.TravelPlanId).Distinct().ToList();
-        var plans = (await _travelPlans.GetMetaBatchAsync(planIds, cancellationToken))
+        var plans = (await _travelPlans.GetMetaBatchAsync(context, planIds, cancellationToken))
             .ToDictionary(p => p.Id);
         var userIds = plans.Values.Select(p => p.UserId).Distinct().ToList();
         var users = await _web1.GetUsersBriefAsync(userIds, cancellationToken);
@@ -53,8 +54,8 @@ public sealed class AdminDestinationService : IAdminDestinationService
                 OwnerDisplayName = user?.DisplayName ?? "Korisnik",
                 Name = d.Name,
                 Location = d.Location,
-                ArrivalDate = d.ArrivalDate,
-                DepartureDate = d.DepartureDate,
+                ArrivalDate = DateContract.FromDateOnly(d.ArrivalDate),
+                DepartureDate = DateContract.FromDateOnly(d.DepartureDate),
                 Notes = d.Notes,
                 CreatedAtUtc = d.CreatedAtUtc,
                 UpdatedAtUtc = d.UpdatedAtUtc
@@ -63,6 +64,7 @@ public sealed class AdminDestinationService : IAdminDestinationService
     }
 
     public async Task<IReadOnlyList<AdminTravelPlanOptionDto>> ListTravelPlansAsync(
+        ServiceCallContext context,
         CancellationToken cancellationToken = default)
     {
         var planIds = await _db.TravelDestinations.AsNoTracking()
@@ -70,7 +72,7 @@ public sealed class AdminDestinationService : IAdminDestinationService
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        var plans = await _travelPlans.GetMetaBatchAsync(planIds, cancellationToken);
+        var plans = await _travelPlans.GetMetaBatchAsync(context, planIds, cancellationToken);
         var userIds = plans.Select(p => p.UserId).Distinct().ToList();
         var users = await _web1.GetUsersBriefAsync(userIds, cancellationToken);
 

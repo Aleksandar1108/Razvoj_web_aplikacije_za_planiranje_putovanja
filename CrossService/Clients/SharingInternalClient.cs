@@ -1,53 +1,47 @@
-using System.Net.Http.Json;
-using CrossService.Dtos;
-using CrossService.Options;
-using Microsoft.Extensions.Options;
+using ServiceContracts;
+using ServiceContracts.Remoting;
 
 namespace CrossService.Clients;
 
 public interface ISharingInternalClient
 {
-    Task<string> ResolveShareTokenAccessAsync(Guid travelPlanId, bool requiresMutation, CancellationToken cancellationToken);
-    Task<string> ResolveRecipientAccessAsync(Guid travelPlanId, bool requiresMutation, CancellationToken cancellationToken);
+    Task<string> ResolveShareTokenAccessAsync(ServiceCallContext context, Guid travelPlanId, bool requiresMutation, CancellationToken cancellationToken);
+    Task<string> ResolveRecipientAccessAsync(ServiceCallContext context, Guid travelPlanId, bool requiresMutation, CancellationToken cancellationToken);
 }
 
 public sealed class SharingInternalClient : ISharingInternalClient
 {
-    private readonly HttpClient _http;
-    private readonly MicroserviceUrlsOptions _urls;
+    private readonly ISharingRemotingService _proxy;
 
-    public SharingInternalClient(HttpClient http, IOptions<MicroserviceUrlsOptions> urls)
+    public SharingInternalClient()
     {
-        _http = http;
-        _urls = urls.Value;
+        _proxy = ServiceFabricRemoting.CreateProxy<ISharingRemotingService>(ServiceFabricRemoting.ServiceNames.SharingApi);
     }
 
-    private string Base => _urls.SharingApi.TrimEnd('/');
-
     public async Task<string> ResolveShareTokenAccessAsync(
+        ServiceCallContext context,
         Guid travelPlanId,
         bool requiresMutation,
         CancellationToken cancellationToken)
     {
-        var url = $"{Base}/api/v1/internal/access/share-token?travelPlanId={travelPlanId:D}&requiresMutation={requiresMutation.ToString().ToLowerInvariant()}";
-        var res = await _http.GetAsync(url, cancellationToken);
-        if (!res.IsSuccessStatusCode)
-            return "none";
-        var dto = await res.Content.ReadFromJsonAsync<ShareAccessDto>(cancellationToken);
-        return dto?.Kind ?? "none";
+        var dto = await _proxy.ResolveShareTokenAccessAsync(context, travelPlanId, requiresMutation, cancellationToken);
+        return dto.Kind;
     }
 
     public async Task<string> ResolveRecipientAccessAsync(
+        ServiceCallContext context,
         Guid travelPlanId,
         bool requiresMutation,
         CancellationToken cancellationToken)
     {
-        var url = $"{Base}/api/v1/internal/access/recipient?travelPlanId={travelPlanId:D}&requiresMutation={requiresMutation.ToString().ToLowerInvariant()}";
-        var res = await _http.GetAsync(url, cancellationToken);
-        if (res.StatusCode == System.Net.HttpStatusCode.NotFound || res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        try
+        {
+            var dto = await _proxy.ResolveRecipientAccessAsync(context, travelPlanId, requiresMutation, cancellationToken);
+            return dto.Kind;
+        }
+        catch (ServiceOperationException ex) when (ex.StatusCode is 401 or 404)
+        {
             return "none";
-        res.EnsureSuccessStatusCode();
-        var dto = await res.Content.ReadFromJsonAsync<ShareAccessDto>(cancellationToken);
-        return dto?.Kind ?? "none";
+        }
     }
 }

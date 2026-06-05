@@ -1,7 +1,4 @@
-using System.Net.Http.Json;
-using CrossService.Dtos;
-using CrossService.Options;
-using Microsoft.Extensions.Options;
+using ServiceContracts.Remoting;
 
 namespace CrossService.Clients;
 
@@ -12,26 +9,23 @@ public interface IActivitiesInternalClient
 
 public sealed class ActivitiesInternalClient : IActivitiesInternalClient
 {
-    private readonly HttpClient _http;
-    private readonly MicroserviceUrlsOptions _urls;
+    private readonly IActivitiesRemotingService _proxy;
 
-    public ActivitiesInternalClient(HttpClient http, IOptions<MicroserviceUrlsOptions> urls)
+    public ActivitiesInternalClient()
     {
-        _http = http;
-        _urls = urls.Value;
+        _proxy = ServiceFabricRemoting.CreateProxy<IActivitiesRemotingService>(ServiceFabricRemoting.ServiceNames.ActivitiesApi);
     }
-
-    private string Base => _urls.ActivitiesApi.TrimEnd('/');
 
     public async Task<decimal> GetEstimatedCostSumAsync(Guid travelPlanId, CancellationToken cancellationToken)
     {
-        var res = await _http.GetAsync(
-            $"{Base}/api/v1/internal/travel-plans/{travelPlanId:D}/activities/estimated-cost-sum",
-            cancellationToken);
-        if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+        try
+        {
+            var dto = await _proxy.GetEstimatedCostSumAsync(travelPlanId, cancellationToken);
+            return dto.TotalEstimatedCost;
+        }
+        catch (ServiceContracts.ServiceOperationException ex) when (ex.StatusCode == 404)
+        {
             return 0m;
-        res.EnsureSuccessStatusCode();
-        var dto = await res.Content.ReadFromJsonAsync<ActivityCostSumDto>(cancellationToken);
-        return dto?.TotalEstimatedCost ?? 0m;
+        }
     }
 }

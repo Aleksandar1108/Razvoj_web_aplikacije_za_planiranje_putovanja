@@ -1,0 +1,17 @@
+<Project>
+  <!-- Sdk.Web već uključuje appsettings — tamo samo Update; ostali SF servisi trebaju eksplicitni Include. -->
+  <ItemGroup Condition="'$(IsServiceFabricServiceProject)' == 'True'">
+    <Content Include="appsettings.json" Condition="Exists('appsettings.json') AND '$(UsingMicrosoftNETSdkWeb)' != 'true'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.json" Condition="Exists('appsettings.json') AND '$(UsingMicrosoftNETSdkWeb)' == 'true'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="appsettings.Development.json" Condition="Exists('appsettings.Development.json') AND '$(UsingMicrosoftNETSdkWeb)' != 'true'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.Development.json" Condition="Exists('appsettings.Development.json') AND '$(UsingMicrosoftNETSdkWeb)' == 'true'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

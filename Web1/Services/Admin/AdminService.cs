@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Web1.Data;
 using Web1.Data.Entities;
-using Web1.Dtos.Admin;
+using ServiceContracts.Dtos;
 using Web1.Services.Auth;
 
 namespace Web1.Services.Admin;

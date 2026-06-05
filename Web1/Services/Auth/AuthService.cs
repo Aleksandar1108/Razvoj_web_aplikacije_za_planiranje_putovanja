@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Web1.Data;
 using Web1.Data.Entities;
-using Web1.Dtos.Auth;
+using ServiceContracts.Dtos;
 using Web1.Options;
 
 namespace Web1.Services.Auth;

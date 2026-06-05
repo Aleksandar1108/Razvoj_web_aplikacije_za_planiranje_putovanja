@@ -1,9 +1,9 @@
 using ActivitiesApi.Data;
 using ActivitiesApi.Data.Entities;
-using ActivitiesApi.Dtos;
 using CrossService.Clients;
-using CrossService.Dtos;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
+using ServiceContracts.Dtos;
 
 namespace ActivitiesApi.Services;
 
@@ -55,7 +55,7 @@ public sealed class ActivityService : IActivityService
         var plan = await _travelPlans.GetMetaAsync(travelPlanId, cancellationToken)
                    ?? throw new InvalidOperationException("Plan putovanja nije pronađen.");
 
-        var date = request.ActivityDate!.Value;
+        var date = DateContract.RequireDateOnly(request.ActivityDate);
         ValidateAgainstPlan(date, plan);
         var status = NormalizeStatus(request.Status);
         ValidateEstimatedCost(request.EstimatedCost);
@@ -96,7 +96,7 @@ public sealed class ActivityService : IActivityService
         if (entity is null)
             return null;
 
-        var date = request.ActivityDate!.Value;
+        var date = DateContract.RequireDateOnly(request.ActivityDate);
         ValidateAgainstPlan(date, plan);
         var status = NormalizeStatus(request.Status);
         ValidateEstimatedCost(request.EstimatedCost);
@@ -150,7 +150,7 @@ public sealed class ActivityService : IActivityService
 
     private static void ValidateAgainstPlan(DateOnly activityDate, TravelPlanMetaDto plan)
     {
-        if (activityDate < plan.StartDate || activityDate > plan.EndDate)
+        if (activityDate < DateContract.ToDateOnly(plan.StartDate) || activityDate > DateContract.ToDateOnly(plan.EndDate))
             throw new ArgumentException("Datum aktivnosti mora biti u okviru datuma plana putovanja.");
     }
 
@@ -174,7 +174,7 @@ public sealed class ActivityService : IActivityService
             Id = e.Id,
             TravelPlanId = e.TravelPlanId,
             Name = e.Name,
-            ActivityDate = e.ActivityDate,
+            ActivityDate = DateContract.FromDateOnly(e.ActivityDate),
             ActivityTime = e.ActivityTime,
             Location = e.Location,
             Description = e.Description,

@@ -1,140 +1,182 @@
 using System.Fabric;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Net.Http;
+using CrossService;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using Microsoft.ServiceFabric.Services.Communication.AspNetCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.ServiceFabric.Data;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
+using Microsoft.ServiceFabric.Services.Remoting.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
+using ServiceContracts;
+using ServiceContracts.Dtos;
+using ServiceContracts.Remoting;
 using SharingApi.Data;
 using SharingApi.Infrastructure;
-using SharingApi.Options;
 using SharingApi.Services;
-using CrossService;
 
 namespace SharingApi;
 
-internal sealed class SharingApiService : StatelessService
+internal sealed class SharingApiService : StatefulService, ISharingRemotingService
 {
-    public SharingApiService(StatelessServiceContext context)
+    private readonly IServiceProvider _services;
+
+    public SharingApiService(StatefulServiceContext context)
         : base(context)
     {
+        _services = ServiceHostBootstrap.BuildProvider((services, configuration) =>
+        {
+            services.AddSingleton(context);
+            services.AddSingleton(StateManager);
+            services.AddSingleton<IReliableStateManager>(StateManager);
+            services.AddSingleton<IShareAccessCache, ShareAccessCache>();
+
+            var connectionString = configuration["ConnectionStrings:DefaultConnection"]?.Trim();
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new InvalidOperationException(
+                    "ConnectionStrings:DefaultConnection je prazan. Proveri ApplicationParameters (SharingApi_DefaultConnection) ili appsettings.json.");
+
+            services.AddDbContext<SharingDbContext>(options => options.UseSqlServer(connectionString));
+            services.AddCrossServiceRemoting();
+            services.AddScoped<ISharingService, SharingService>();
+        });
     }
 
-    protected override IEnumerable<ServiceInstanceListener> CreateServiceInstanceListeners()
-    {
-        return
-        [
-            new ServiceInstanceListener(serviceContext =>
-                new KestrelCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
-                {
-                    ServiceEventSource.Current.ServiceMessage(serviceContext, $"SharingApi Kestrel: {url}");
+    protected override IEnumerable<ServiceReplicaListener> CreateServiceReplicaListeners() =>
+        this.CreateServiceRemotingReplicaListeners();
 
-                    var builder = WebApplication.CreateBuilder();
+    public Task<CreateTravelPlanShareLinkResponseDto> CreateShareLinkAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        CreateTravelPlanShareLinkRequestDto request,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var userId = RemotingAuth.RequireUserId(context);
+            try
+            {
+                return await sp.GetRequiredService<ISharingService>()
+                    .CreateShareLinkAsync(userId, travelPlanId, request, ct);
+            }
+            catch (InvalidOperationException)
+            {
+                throw new ServiceOperationException(404, "Plan putovanja nije pronađen.");
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ServiceOperationException(400, ex.Message);
+            }
+        }, cancellationToken);
 
-                    builder.Services.AddSingleton<StatelessServiceContext>(serviceContext);
-                    builder.WebHost
-                        .UseKestrel()
-                        .UseContentRoot(Directory.GetCurrentDirectory())
-                        .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.None)
-                        .UseUrls(url);
+    public Task<List<SharedTravelPlanListItemDto>> ListSharedPlansAsync(
+        ServiceCallContext context,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var userId = RemotingAuth.RequireUserId(context);
+            try
+            {
+                return (await sp.GetRequiredService<ISharingService>()
+                    .ListSharedPlansForUserAsync(userId, ct)).ToList();
+            }
+            catch (HttpRequestException)
+            {
+                throw new ServiceOperationException(
+                    503,
+                    "Podaci o planovima trenutno nisu dostupni. Proveri da li je pokrenut TravelPlansApi i SharingApi.");
+            }
+        }, cancellationToken);
 
-                    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")?.Trim();
-                    if (string.IsNullOrWhiteSpace(connectionString))
-                        throw new InvalidOperationException(
-                            "ConnectionStrings:DefaultConnection je prazan. Proveri ApplicationParameters (SharingApi_DefaultConnection) ili appsettings.json.");
+    public Task<ClaimShareLinkResponseDto> ClaimShareLinkAsync(
+        ServiceCallContext context,
+        ClaimShareLinkRequestDto request,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var userId = RemotingAuth.RequireUserId(context);
+            var result = await sp.GetRequiredService<ISharingService>()
+                .ClaimShareLinkAsync(userId, request, ct);
+            if (result is null)
+                throw new ServiceOperationException(404, "Link za deljenje nije pronađen.");
+            return result;
+        }, cancellationToken);
 
-                    builder.Services.AddDbContext<SharingDbContext>(options =>
-                        options.UseSqlServer(connectionString));
+    public Task<ShareAccessDto> ResolveShareTokenAccessAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        bool requiresMutation,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var token = context.ShareToken?.Trim();
+            if (string.IsNullOrWhiteSpace(token))
+                return new ShareAccessDto { Kind = "none" };
 
-                    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
-                    var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-                        ?? throw new InvalidOperationException("Sekcija Jwt u konfiguraciji nedostaje.");
-                    if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)
-                        throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 karaktera (isti ključ kao kod Web1 auth servisa).");
+            var db = sp.GetRequiredService<SharingDbContext>();
+            var cache = sp.GetRequiredService<IShareAccessCache>();
 
-                    builder.Services.AddCrossServiceClients(builder.Configuration);
-                    builder.Services.AddScoped<ISharingService, SharingService>();
+            var tokenHash = ShareTokenCrypto.HashToken(token);
+            var cacheKey = $"{tokenHash}:{travelPlanId:D}:{requiresMutation}";
+            var cachedKind = await cache.TryGetAsync(cacheKey, ct);
+            if (cachedKind is not null)
+                return new ShareAccessDto { Kind = cachedKind };
 
-                    builder.Services.AddCors(options =>
-                    {
-                        options.AddDefaultPolicy(policy =>
-                        {
-                            policy.AllowAnyHeader()
-                                .AllowAnyMethod()
-                                .SetIsOriginAllowed(_ => true);
-                        });
-                    });
+            var now = DateTime.UtcNow;
+            var link = await db.TravelPlanShareLinks.AsNoTracking()
+                .FirstOrDefaultAsync(
+                    l => l.TokenHash == tokenHash
+                         && l.TravelPlanId == travelPlanId
+                         && l.RevokedAtUtc == null
+                         && (l.ExpiresAtUtc == null || l.ExpiresAtUtc > now),
+                    ct);
 
-                    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                        .AddJwtBearer(options =>
-                        {
-                            options.TokenValidationParameters = new TokenValidationParameters
-                            {
-                                ValidateIssuer = true,
-                                ValidateAudience = true,
-                                ValidateLifetime = true,
-                                ValidateIssuerSigningKey = true,
-                                ValidIssuer = jwt.Issuer,
-                                ValidAudience = jwt.Audience,
-                                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                                ClockSkew = TimeSpan.FromMinutes(1)
-                            };
-                        });
+            if (link is null)
+            {
+                await cache.SetAsync(cacheKey, "none", ct);
+                return new ShareAccessDto { Kind = "none" };
+            }
 
-                    builder.Services.AddAuthorization();
+            var perm = link.Permission.Trim().ToLowerInvariant();
+            if (requiresMutation && perm != "edit")
+            {
+                await cache.SetAsync(cacheKey, "none", ct);
+                return new ShareAccessDto { Kind = "none" };
+            }
 
-                    builder.Services.AddControllers();
-                    builder.Services.AddEndpointsApiExplorer();
-                    builder.Services.AddSwaggerGen(c =>
-                    {
-                        c.SwaggerDoc("v1", new OpenApiInfo
-                        {
-                            Title = "Deljenje planova (mikroservis)",
-                            Version = "v1",
-                            Description = "Kreiranje share linkova (QR) i lista deljenih planova; JWT izdaje Web1 /auth."
-                        });
-                        c.AddJwtBearerSecurity();
-                    });
-                    builder.Services.AddProblemDetails();
+            var kind = perm == "edit" ? "shareEdit" : "shareView";
+            await cache.SetAsync(cacheKey, kind, ct);
+            return new ShareAccessDto { Kind = kind };
+        }, cancellationToken);
 
-                    var app = builder.Build();
-                    if (app.Environment.IsDevelopment())
-                        app.UseDeveloperExceptionPage();
-                    else
-                        app.UseExceptionHandler();
+    public Task<ShareAccessDto> ResolveRecipientAccessAsync(
+        ServiceCallContext context,
+        Guid travelPlanId,
+        bool requiresMutation,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var userId = RemotingAuth.RequireUserId(context);
+            var db = sp.GetRequiredService<SharingDbContext>();
 
-                    app.UseCors();
-                    if (app.Environment.IsDevelopment())
-                    {
-                        app.UseSwagger();
-                        app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Sharing API v1"));
-                    }
+            var recipient = await db.TravelPlanShareRecipients.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.TravelPlanId == travelPlanId && r.RecipientUserId == userId, ct);
 
-                    app.UseAuthentication();
-                    app.UseAuthorization();
-                    app.MapControllers();
+            if (recipient is null)
+                return new ShareAccessDto { Kind = "none" };
 
-                    app.MapGet("/api/v1/health", () => Results.Ok(new { status = "ok", service = "SharingApi" }));
-                    app.MapGet("/api/v1/health/db", async (SharingDbContext db, CancellationToken ct) =>
-                    {
-                        try
-                        {
-                            await db.Database.OpenConnectionAsync(ct);
-                            await db.Database.CloseConnectionAsync();
-                            return Results.Ok(new { status = "ok", database = "connected" });
-                        }
-                        catch (Exception ex)
-                        {
-                            return Results.Json(
-                                new { status = "error", message = ex.Message },
-                                statusCode: StatusCodes.Status503ServiceUnavailable);
-                        }
-                    });
+            var perm = recipient.Permission.Trim().ToLowerInvariant();
+            if (requiresMutation && perm != "edit")
+                return new ShareAccessDto { Kind = "none" };
 
-                    return app;
-                }))
-        ];
-    }
+            return new ShareAccessDto { Kind = perm == "edit" ? "shareEdit" : "shareView" };
+        }, cancellationToken);
+
+    public Task<CascadeDeleteResultDto> CascadeDeleteTravelPlanDataAsync(
+        Guid travelPlanId,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var deleted = await sp.GetRequiredService<ISharingService>()
+                .DeleteAllByTravelPlanIdAsync(travelPlanId, ct);
+            return new CascadeDeleteResultDto { Deleted = deleted };
+        }, cancellationToken);
 }

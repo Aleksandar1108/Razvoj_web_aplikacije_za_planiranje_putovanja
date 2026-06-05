@@ -1,4 +1,4 @@
-using Web1.Dtos.Admin;
+using ServiceContracts.Dtos;
 
 namespace Web1.Services.Admin;
 

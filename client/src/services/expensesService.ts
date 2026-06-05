@@ -9,7 +9,7 @@ function basePath(planId: string): string {
 function requireBase(): string {
   const b = getExpensesApiBaseUrl();
   if (!b) {
-    throw new ApiError('Nije podešen VITE_EXPENSES_API_BASE_URL u .env fajlu.', 0);
+    throw new ApiError('Nije podešen VITE_API_BASE_URL u .env fajlu (ApiGateway).', 0);
   }
   return b;
 }

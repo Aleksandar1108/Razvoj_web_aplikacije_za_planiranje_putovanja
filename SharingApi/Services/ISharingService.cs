@@ -1,4 +1,4 @@
-using SharingApi.Dtos;
+using ServiceContracts.Dtos;
 
 namespace SharingApi.Services;
 

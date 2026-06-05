@@ -1,7 +1,5 @@
-using System.Net.Http.Json;
-using CrossService.Dtos;
-using CrossService.Options;
-using Microsoft.Extensions.Options;
+using ServiceContracts.Dtos;
+using ServiceContracts.Remoting;
 
 namespace CrossService.Clients;
 
@@ -14,48 +12,29 @@ public interface IWeb1InternalClient
 
 public sealed class Web1InternalClient : IWeb1InternalClient
 {
-    private readonly HttpClient _http;
-    private readonly MicroserviceUrlsOptions _urls;
+    private readonly IWeb1RemotingService _proxy;
 
-    public Web1InternalClient(HttpClient http, IOptions<MicroserviceUrlsOptions> urls)
+    public Web1InternalClient()
     {
-        _http = http;
-        _urls = urls.Value;
+        _proxy = ServiceFabricRemoting.CreateProxy<IWeb1RemotingService>(ServiceFabricRemoting.ServiceNames.Web1);
     }
-
-    private string Base => _urls.Web1.TrimEnd('/');
 
     public async Task<bool> UserExistsAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var res = await _http.GetAsync($"{Base}/api/v1/internal/users/{userId:D}/exists", cancellationToken);
-        if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return false;
-        res.EnsureSuccessStatusCode();
-        var dto = await res.Content.ReadFromJsonAsync<UserExistsDto>(cancellationToken);
-        return dto?.Exists ?? false;
+        var dto = await _proxy.UserExistsAsync(userId, cancellationToken);
+        return dto.Exists;
     }
 
     public async Task<IReadOnlyDictionary<Guid, UserBriefDto>> GetUsersBriefAsync(
         IReadOnlyList<Guid> userIds,
         CancellationToken cancellationToken)
     {
-        if (userIds.Count == 0)
-            return new Dictionary<Guid, UserBriefDto>();
-
-        var res = await _http.PostAsJsonAsync(
-            $"{Base}/api/v1/internal/users/brief",
-            new UsersBriefRequestDto { UserIds = userIds.Distinct().ToList() },
+        var list = await _proxy.GetUsersBriefAsync(
+            new UsersBriefRequestDto { UserIds = userIds.ToList() },
             cancellationToken);
-        res.EnsureSuccessStatusCode();
-        var list = await res.Content.ReadFromJsonAsync<List<UserBriefDto>>(cancellationToken) ?? new List<UserBriefDto>();
         return list.ToDictionary(u => u.Id);
     }
 
-    public async Task CreateAdminNotificationAsync(
-        CreateAdminNotificationRequestDto request,
-        CancellationToken cancellationToken)
-    {
-        var res = await _http.PostAsJsonAsync($"{Base}/api/v1/internal/notifications", request, cancellationToken);
-        res.EnsureSuccessStatusCode();
-    }
+    public Task CreateAdminNotificationAsync(CreateAdminNotificationRequestDto request, CancellationToken cancellationToken) =>
+        _proxy.CreateAdminNotificationAsync(request, cancellationToken);
 }

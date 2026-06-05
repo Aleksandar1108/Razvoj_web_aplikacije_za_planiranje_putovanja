@@ -1,4 +1,4 @@
-using ActivitiesApi.Dtos;
+using ServiceContracts.Dtos;
 
 namespace ActivitiesApi.Services;
 

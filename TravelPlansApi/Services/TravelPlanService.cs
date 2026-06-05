@@ -1,8 +1,9 @@
 using CrossService.Clients;
 using Microsoft.EntityFrameworkCore;
+using ServiceContracts;
+using ServiceContracts.Dtos;
 using TravelPlansApi.Data;
 using TravelPlansApi.Data.Entities;
-using TravelPlansApi.Dtos;
 
 namespace TravelPlansApi.Services;
 
@@ -44,8 +45,8 @@ public sealed class TravelPlanService : ITravelPlanService
 
     public async Task<TravelPlanResponseDto> CreateAsync(Guid userId, CreateTravelPlanRequestDto request, CancellationToken cancellationToken)
     {
-        var start = request.StartDate!.Value;
-        var end = request.EndDate!.Value;
+        var start = DateContract.RequireDateOnly(request.StartDate);
+        var end = DateContract.RequireDateOnly(request.EndDate);
         if (end < start)
             throw new ArgumentException("Krajnji datum ne može biti prije početnog.");
         if (request.PlannedBudget < 0)
@@ -124,8 +125,8 @@ public sealed class TravelPlanService : ITravelPlanService
 
     private static void ApplyUpdate(TravelPlanEntity entity, UpdateTravelPlanRequestDto request)
     {
-        var start = request.StartDate!.Value;
-        var end = request.EndDate!.Value;
+        var start = DateContract.RequireDateOnly(request.StartDate);
+        var end = DateContract.RequireDateOnly(request.EndDate);
         if (end < start)
             throw new ArgumentException("Krajnji datum ne može biti prije početnog.");
         if (request.PlannedBudget < 0)
@@ -146,8 +147,8 @@ public sealed class TravelPlanService : ITravelPlanService
             Id = e.Id,
             Name = e.Name,
             ShortDescription = e.ShortDescription,
-            StartDate = e.StartDate,
-            EndDate = e.EndDate,
+            StartDate = DateContract.FromDateOnly(e.StartDate),
+            EndDate = DateContract.FromDateOnly(e.EndDate),
             PlannedBudget = e.PlannedBudget,
             GeneralNotes = e.GeneralNotes,
             CreatedAtUtc = e.CreatedAtUtc,

@@ -5,14 +5,16 @@ import { useAuth } from '../context/AuthContext';
 import { createTravelPlan, getTravelPlan, updateTravelPlan } from '../services/travelPlansService';
 import type { TravelPlanUpsert } from '../models/travelPlan';
 import { ApiError } from '../services/httpClient';
+import { addDaysIso, defaultNewTripDates, todayIsoDate, toInputDateValue } from '../utils/dates';
 import { roundMoney } from '../utils/money';
 
 function emptyForm(): TravelPlanUpsert {
+  const { startDate, endDate } = defaultNewTripDates();
   return {
     name: '',
     shortDescription: '',
-    startDate: '',
-    endDate: '',
+    startDate,
+    endDate,
     plannedBudget: 0,
     generalNotes: '',
   };
@@ -38,11 +40,13 @@ export function TravelPlanFormPage() {
       try {
         const p = await getTravelPlan(planId, accessToken);
         if (cancelled) return;
+        const startDate = toInputDateValue(p.startDate, todayIsoDate());
+        const endDate = toInputDateValue(p.endDate, addDaysIso(startDate, 7));
         setForm({
           name: p.name,
           shortDescription: p.shortDescription,
-          startDate: p.startDate,
-          endDate: p.endDate,
+          startDate,
+          endDate: endDate < startDate ? addDaysIso(startDate, 7) : endDate,
           plannedBudget: roundMoney(p.plannedBudget),
           generalNotes: p.generalNotes ?? '',
         });
@@ -59,6 +63,8 @@ export function TravelPlanFormPage() {
 
   const budgetInputValue =
     isEdit || form.plannedBudget !== 0 ? (Number.isNaN(form.plannedBudget) ? '' : String(form.plannedBudget)) : '';
+  const minStartDate = isEdit ? undefined : todayIsoDate();
+  const minEndDate = form.startDate || todayIsoDate();
 
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();
@@ -160,8 +166,16 @@ export function TravelPlanFormPage() {
               <input
                 type="date"
                 required
+                min={minStartDate}
                 value={form.startDate}
-                onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                onChange={(e) => {
+                  const startDate = e.target.value;
+                  setForm((f) => {
+                    const endDate =
+                      f.endDate && f.endDate >= startDate ? f.endDate : addDaysIso(startDate, 7);
+                    return { ...f, startDate, endDate };
+                  });
+                }}
               />
             </label>
             <label>
@@ -169,6 +183,7 @@ export function TravelPlanFormPage() {
               <input
                 type="date"
                 required
+                min={minEndDate}
                 value={form.endDate}
                 onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
               />

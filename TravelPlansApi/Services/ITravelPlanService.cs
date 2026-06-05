@@ -1,4 +1,4 @@
-using TravelPlansApi.Dtos;
+using ServiceContracts.Dtos;
 
 namespace TravelPlansApi.Services;
 

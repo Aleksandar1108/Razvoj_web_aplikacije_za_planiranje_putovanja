@@ -1,6 +1,6 @@
 using ChecklistApi.Data;
 using ChecklistApi.Data.Entities;
-using ChecklistApi.Dtos;
+using ServiceContracts.Dtos;
 using CrossService.Clients;
 using Microsoft.EntityFrameworkCore;
 

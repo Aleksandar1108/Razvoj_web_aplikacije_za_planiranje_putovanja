@@ -1,13 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <StartupServicesManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Parameters>
+    <Parameter Name="ApiGateway_InstanceCount" DefaultValue="-1" />
+    <Parameter Name="NotificationDispatcher_MinReplicaSetSize" DefaultValue="1" />
+    <Parameter Name="NotificationDispatcher_TargetReplicaSetSize" DefaultValue="1" />
+    <Parameter Name="SharingApi_MinReplicaSetSize" DefaultValue="1" />
+    <Parameter Name="SharingApi_TargetReplicaSetSize" DefaultValue="1" />
     <Parameter Name="Web1_InstanceCount" DefaultValue="-1" />
     <Parameter Name="TravelPlansApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="DestinationsApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="ActivitiesApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="ExpensesApi_InstanceCount" DefaultValue="-1" />
     <Parameter Name="ChecklistApi_InstanceCount" DefaultValue="-1" />
-    <Parameter Name="SharingApi_InstanceCount" DefaultValue="-1" />
   </Parameters>
   <Services>
     <!-- The section below creates instances of service types, when an instance of this 
@@ -15,6 +19,11 @@
          ServiceFabric PowerShell module.
 
          The attribute ServiceTypeName below must match the name defined in the imported ServiceManifest.xml file. -->
+    <Service Name="ApiGateway" ServicePackageActivationMode="ExclusiveProcess">
+      <StatelessService ServiceTypeName="ApiGatewayType" InstanceCount="[ApiGateway_InstanceCount]">
+        <SingletonPartition />
+      </StatelessService>
+    </Service>
     <Service Name="Web1" ServicePackageActivationMode="ExclusiveProcess">
       <StatelessService ServiceTypeName="Web1Type" InstanceCount="[Web1_InstanceCount]">
         <SingletonPartition />
@@ -46,9 +55,14 @@
       </StatelessService>
     </Service>
     <Service Name="SharingApi" ServicePackageActivationMode="ExclusiveProcess">
-      <StatelessService ServiceTypeName="SharingApiType" InstanceCount="[SharingApi_InstanceCount]">
-        <SingletonPartition />
-      </StatelessService>
+      <StatefulService ServiceTypeName="SharingApiType" TargetReplicaSetSize="[SharingApi_TargetReplicaSetSize]" MinReplicaSetSize="[SharingApi_MinReplicaSetSize]">
+        <UniformInt64Partition PartitionCount="1" LowKey="-9223372036854775808" HighKey="9223372036854775807" />
+      </StatefulService>
+    </Service>
+    <Service Name="NotificationDispatcher" ServicePackageActivationMode="ExclusiveProcess">
+      <StatefulService ServiceTypeName="NotificationDispatcherType" TargetReplicaSetSize="[NotificationDispatcher_TargetReplicaSetSize]" MinReplicaSetSize="[NotificationDispatcher_MinReplicaSetSize]">
+        <UniformInt64Partition PartitionCount="1" LowKey="-9223372036854775808" HighKey="9223372036854775807" />
+      </StatefulService>
     </Service>
   </Services>
 </StartupServicesManifest>

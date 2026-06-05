@@ -5,7 +5,7 @@ import { ApiError, apiRequestWithBase } from './httpClient';
 function requireBase(): string {
   const b = getDestinationsApiBaseUrl();
   if (!b) {
-    throw new ApiError('Nije podešen VITE_DESTINATIONS_API_BASE_URL u .env fajlu.', 0);
+    throw new ApiError('Nije podešen VITE_API_BASE_URL u .env fajlu (ApiGateway).', 0);
   }
   return b;
 }

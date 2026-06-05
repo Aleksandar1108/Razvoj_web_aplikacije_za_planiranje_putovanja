@@ -1,6 +1,11 @@
+using Microsoft.ServiceFabric.Services.Remoting;
+using Microsoft.ServiceFabric.Services.Remoting.FabricTransport;
 using Microsoft.ServiceFabric.Services.Runtime;
 using System.Diagnostics;
-using ChecklistApi;
+
+[assembly: FabricTransportServiceRemotingProvider(RemotingListenerVersion = RemotingListenerVersion.V2)]
+
+namespace ChecklistApi;
 
 internal static class Program
 {
