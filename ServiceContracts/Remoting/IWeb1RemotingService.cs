@@ -12,7 +12,9 @@ public interface IWeb1RemotingService : IService
     Task<AdminSystemStatsDto> GetAdminStatsAsync(ServiceCallContext context, CancellationToken cancellationToken);
     Task<List<AdminUserListItemDto>> ListAdminUsersAsync(ServiceCallContext context, CancellationToken cancellationToken);
     Task<AdminUserListItemDto> GetAdminUserAsync(ServiceCallContext context, Guid userId, CancellationToken cancellationToken);
+    Task<AdminUserListItemDto> CreateAdminUserAsync(ServiceCallContext context, CreateAdminUserRequestDto request, CancellationToken cancellationToken);
     Task<AdminUserListItemDto> UpdateAdminUserAsync(ServiceCallContext context, Guid userId, UpdateAdminUserRequestDto request, CancellationToken cancellationToken);
+    Task DeleteAdminUserAsync(ServiceCallContext context, Guid userId, CancellationToken cancellationToken);
 
     Task<List<UserNotificationDto>> ListNotificationsAsync(ServiceCallContext context, CancellationToken cancellationToken);
     Task<UnreadNotificationCountDto> GetUnreadNotificationCountAsync(ServiceCallContext context, CancellationToken cancellationToken);

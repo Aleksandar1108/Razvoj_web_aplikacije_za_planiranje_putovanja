@@ -1,4 +1,9 @@
-import type { AdminSystemStats, AdminUserRow, UpdateAdminUserRequest } from '../models/admin';
+import type {
+  AdminSystemStats,
+  AdminUserRow,
+  CreateAdminUserRequest,
+  UpdateAdminUserRequest,
+} from '../models/admin';
 import { apiRequest } from './httpClient';
 
 export const adminService = {
@@ -10,6 +15,22 @@ export const adminService = {
     return apiRequest<AdminUserRow[]>('/api/v1/admin/users', { method: 'GET' }, accessToken);
   },
 
+  async getUser(accessToken: string | null, userId: string): Promise<AdminUserRow> {
+    return apiRequest<AdminUserRow>(
+      `/api/v1/admin/users/${encodeURIComponent(userId)}`,
+      { method: 'GET' },
+      accessToken
+    );
+  },
+
+  async createUser(accessToken: string | null, body: CreateAdminUserRequest): Promise<AdminUserRow> {
+    return apiRequest<AdminUserRow>(
+      '/api/v1/admin/users',
+      { method: 'POST', body: JSON.stringify(body) },
+      accessToken
+    );
+  },
+
   async updateUser(
     accessToken: string | null,
     userId: string,
@@ -18,6 +39,14 @@ export const adminService = {
     return apiRequest<AdminUserRow>(
       `/api/v1/admin/users/${encodeURIComponent(userId)}`,
       { method: 'PATCH', body: JSON.stringify(body) },
+      accessToken
+    );
+  },
+
+  async deleteUser(accessToken: string | null, userId: string): Promise<void> {
+    await apiRequest<unknown>(
+      `/api/v1/admin/users/${encodeURIComponent(userId)}`,
+      { method: 'DELETE' },
       accessToken
     );
   },

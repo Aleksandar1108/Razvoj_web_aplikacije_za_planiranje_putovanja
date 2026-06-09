@@ -38,6 +38,24 @@ public sealed class AdminController : ControllerBase
         return RemotingHttp.ExecuteAsync(() => _remoting.Web1.GetAdminUserAsync(context, userId, cancellationToken));
     }
 
+    [HttpPost("users")]
+    public async Task<IActionResult> CreateUser(
+        [FromBody] CreateAdminUserRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        var context = ServiceCallContextFactory.FromHttpContext(HttpContext);
+        var result = await RemotingHttp.ExecuteAsync(() =>
+            _remoting.Web1.CreateAdminUserAsync(context, request, cancellationToken));
+
+        if (result.Result is not null)
+            return result.Result;
+
+        return Created($"/api/v1/admin/users/{result.Value!.Id}", result.Value);
+    }
+
     [HttpPatch("users/{userId:guid}")]
     public Task<ActionResult<AdminUserListItemDto>> UpdateUser(
         Guid userId,
@@ -50,5 +68,13 @@ public sealed class AdminController : ControllerBase
         var context = ServiceCallContextFactory.FromHttpContext(HttpContext);
         return RemotingHttp.ExecuteAsync(() =>
             _remoting.Web1.UpdateAdminUserAsync(context, userId, request, cancellationToken));
+    }
+
+    [HttpDelete("users/{userId:guid}")]
+    public Task<IActionResult> DeleteUser(Guid userId, CancellationToken cancellationToken)
+    {
+        var context = ServiceCallContextFactory.FromHttpContext(HttpContext);
+        return RemotingHttp.ExecuteAsync(() =>
+            _remoting.Web1.DeleteAdminUserAsync(context, userId, cancellationToken));
     }
 }

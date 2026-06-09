@@ -26,6 +26,7 @@ export function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,6 +51,22 @@ export function AdminUsersPage() {
     void load();
   }, [load]);
 
+  const remove = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await adminService.deleteUser(accessToken, id);
+      setRows((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+      setConfirmDeleteId(null);
+      const s = await adminService.getStats(accessToken);
+      setStats(s);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Brisanje korisnika nije uspelo.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const patch = async (id: string, body: { isActive?: boolean; roleId?: number }) => {
     setBusyId(id);
     setError(null);
@@ -72,10 +89,13 @@ export function AdminUsersPage() {
           <p className="plans-kicker">Administracija</p>
           <h1>Korisnici sistema</h1>
           <p className="plans-lead">
-            Pregled naloga, uloga (User / Admin) i statusa aktivnosti. Ne možeš ukloniti Admin ulogu sa sopstvenog
-            naloga niti ga deaktivirati.
+            Pregled naloga, uloga (User / Admin) i statusa aktivnosti. Brisanje korisnika uklanja i sve njegove planove
+            putovanja. Ne možeš obrisati sopstveni nalog niti ukloniti Admin ulogu sa sebe.
           </p>
           <div className="form-actions" style={{ marginTop: '1rem' }}>
+            <Link to="/admin/korisnici/new" className="btn btn-glow primary">
+              Novi korisnik
+            </Link>
             <Link to="/admin/planovi" className="btn ghost">
               Upravljanje planovima
             </Link>
@@ -143,6 +163,9 @@ export function AdminUsersPage() {
                     <td>{r.isActive ? <span className="pill">Aktivan</span> : <span className="pill">Neaktivan</span>}</td>
                     <td className="muted">{formatDate(r.createdAtUtc)}</td>
                     <td className="admin-actions">
+                      <Link to={`/admin/korisnici/${r.id}/edit`} className="btn ghost btn-sm">
+                        Izmeni
+                      </Link>
                       <button
                         type="button"
                         className="btn ghost btn-sm"
@@ -163,6 +186,36 @@ export function AdminUsersPage() {
                       >
                         {r.isActive ? 'Deaktiviraj' : 'Aktiviraj'}
                       </button>
+                      {confirmDeleteId === r.id ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn danger btn-sm"
+                            disabled={busy}
+                            onClick={() => void remove(r.id)}
+                          >
+                            {busy ? 'Brišem…' : 'Potvrdi brisanje'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn ghost btn-sm"
+                            disabled={busy}
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            Otkaži
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn danger btn-sm"
+                          disabled={busy || self}
+                          title={self ? 'Ne možeš obrisati sopstveni nalog' : undefined}
+                          onClick={() => setConfirmDeleteId(r.id)}
+                        >
+                          Obriši
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

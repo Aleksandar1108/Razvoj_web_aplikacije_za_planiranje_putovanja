@@ -293,6 +293,21 @@ internal sealed class TravelPlansApiService : StatelessService, ITravelPlansRemo
             };
         }, cancellationToken);
 
+    public Task DeleteAllPlansForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            try
+            {
+                await sp.GetRequiredService<ITravelPlanService>().DeleteAllForUserAsync(userId, ct);
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new ServiceOperationException(
+                    503,
+                    $"Brisanje povezanih podataka planova nije uspelo. {ex.Message}");
+            }
+        }, cancellationToken);
+
     public Task<List<TravelPlanMetaDto>> GetMetaBatchAsync(
         ServiceCallContext context,
         SharedPlanMetaBatchRequestDto request,

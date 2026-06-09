@@ -15,6 +15,7 @@ import { SharedPlansPage } from './pages/SharedPlansPage';
 import { ImportShareQrPage } from './pages/ImportShareQrPage';
 import { ViewShareQrPage } from './pages/ViewShareQrPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminUserFormPage } from './pages/AdminUserFormPage';
 import { AdminDestinationsPage } from './pages/AdminDestinationsPage';
 import { AdminDestinationFormPage } from './pages/AdminDestinationFormPage';
 import { AdminPlansPage } from './pages/AdminPlansPage';
@@ -46,6 +47,8 @@ export default function App() {
             <Route path="/plans/:planId" element={<TravelPlanDetailPage />} />
             <Route element={<AdminRoute />}>
               <Route path="/admin/korisnici" element={<AdminUsersPage />} />
+              <Route path="/admin/korisnici/new" element={<AdminUserFormPage />} />
+              <Route path="/admin/korisnici/:userId/edit" element={<AdminUserFormPage />} />
               <Route path="/admin/planovi" element={<AdminPlansPage />} />
               <Route path="/admin/planovi/new" element={<AdminPlanFormPage />} />
               <Route path="/admin/destinacije" element={<AdminDestinationsPage />} />

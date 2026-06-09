@@ -18,4 +18,6 @@ public interface ITravelPlansRemotingService : IService
     Task<TravelPlanExistsDto> ExistsAsync(Guid travelPlanId, CancellationToken cancellationToken);
     Task<TravelPlanOwnerDto> GetOwnerAsync(ServiceCallContext context, Guid travelPlanId, CancellationToken cancellationToken);
     Task<List<TravelPlanMetaDto>> GetMetaBatchAsync(ServiceCallContext context, SharedPlanMetaBatchRequestDto request, CancellationToken cancellationToken);
+
+    Task DeleteAllPlansForUserAsync(Guid userId, CancellationToken cancellationToken);
 }

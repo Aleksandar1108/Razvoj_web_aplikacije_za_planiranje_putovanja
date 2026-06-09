@@ -123,6 +123,25 @@ public sealed class TravelPlanService : ITravelPlanService
         return true;
     }
 
+    public async Task<int> DeleteAllForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var entities = await _db.TravelPlans
+            .Where(p => p.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        if (entities.Count == 0)
+            return 0;
+
+        foreach (var entity in entities)
+        {
+            await _cascadeDelete.DeleteAllRelatedDataAsync(entity.Id, cancellationToken);
+            _db.TravelPlans.Remove(entity);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return entities.Count;
+    }
+
     private static void ApplyUpdate(TravelPlanEntity entity, UpdateTravelPlanRequestDto request)
     {
         var start = DateContract.RequireDateOnly(request.StartDate);

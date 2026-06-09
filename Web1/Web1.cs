@@ -109,6 +109,21 @@ internal sealed class Web1 : StatelessService, IWeb1RemotingService
             return user;
         }, cancellationToken);
 
+    public Task<AdminUserListItemDto> CreateAdminUserAsync(
+        ServiceCallContext context,
+        CreateAdminUserRequestDto request,
+        CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            RemotingAuth.RequireAdmin(context);
+            var (ok, error, created) = await sp.GetRequiredService<IAdminService>().CreateUserAsync(request, ct);
+            if (!ok && error == "Email je već registrovan.")
+                throw new ServiceOperationException(409, error);
+            if (!ok)
+                throw new ServiceOperationException(400, error ?? "Greška pri kreiranju korisnika.");
+            return created!;
+        }, cancellationToken);
+
     public Task<AdminUserListItemDto> UpdateAdminUserAsync(
         ServiceCallContext context,
         Guid userId,
@@ -122,9 +137,23 @@ internal sealed class Web1 : StatelessService, IWeb1RemotingService
                 .UpdateUserAsync(adminId, userId, request, ct);
             if (!ok && error == "Korisnik nije pronađen.")
                 throw new ServiceOperationException(404, error);
+            if (!ok && error == "Email je već registrovan.")
+                throw new ServiceOperationException(409, error);
             if (!ok)
                 throw new ServiceOperationException(400, error ?? "Greška pri ažuriranju.");
             return updated!;
+        }, cancellationToken);
+
+    public Task DeleteAdminUserAsync(ServiceCallContext context, Guid userId, CancellationToken cancellationToken) =>
+        RemotingScope.ExecuteAsync(_services, async (sp, ct) =>
+        {
+            var adminId = RemotingAuth.RequireUserId(context);
+            RemotingAuth.RequireAdmin(context);
+            var (ok, error) = await sp.GetRequiredService<IAdminService>().DeleteUserAsync(adminId, userId, ct);
+            if (!ok && error == "Korisnik nije pronađen.")
+                throw new ServiceOperationException(404, error);
+            if (!ok)
+                throw new ServiceOperationException(400, error ?? "Greška pri brisanju korisnika.");
         }, cancellationToken);
 
     public Task<List<UserNotificationDto>> ListNotificationsAsync(ServiceCallContext context, CancellationToken cancellationToken) =>

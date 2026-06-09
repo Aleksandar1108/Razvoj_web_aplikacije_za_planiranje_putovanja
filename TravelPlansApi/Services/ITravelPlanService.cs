@@ -19,4 +19,6 @@ public interface ITravelPlanService
     Task<bool> DeleteAsync(Guid userId, Guid planId, CancellationToken cancellationToken);
 
     Task<bool> DeleteByPlanIdAsync(Guid planId, CancellationToken cancellationToken);
+
+    Task<int> DeleteAllForUserAsync(Guid userId, CancellationToken cancellationToken);
 }

@@ -10,6 +10,7 @@ public interface ITravelPlansInternalClient
     Task<bool> ExistsAsync(Guid travelPlanId, CancellationToken cancellationToken);
     Task<TravelPlanOwnerDto> GetOwnerAsync(ServiceCallContext context, Guid travelPlanId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TravelPlanMetaDto>> GetMetaBatchAsync(ServiceCallContext context, IReadOnlyList<Guid> travelPlanIds, CancellationToken cancellationToken);
+    Task DeleteAllPlansForUserAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 public sealed class TravelPlansInternalClient : ITravelPlansInternalClient
@@ -55,4 +56,7 @@ public sealed class TravelPlansInternalClient : ITravelPlansInternalClient
             new SharedPlanMetaBatchRequestDto { TravelPlanIds = travelPlanIds.ToList() },
             cancellationToken);
     }
+
+    public Task DeleteAllPlansForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        _proxy.DeleteAllPlansForUserAsync(userId, cancellationToken);
 }

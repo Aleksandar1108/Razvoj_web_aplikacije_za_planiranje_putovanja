@@ -14,7 +14,20 @@ export interface AdminSystemStats {
   adminUsers: number;
 }
 
+export interface CreateAdminUserRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  roleId: number;
+  isActive: boolean;
+}
+
 export interface UpdateAdminUserRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
   isActive?: boolean;
   roleId?: number;
 }
